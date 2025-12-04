@@ -27,16 +27,18 @@ State file path: `.claude/sprint-$ARGUMENTS-state.json`
 
 Run each check and update the state file. ALL checks must pass.
 
-### 1. Tests Passing
+### 1. Tests Passing with 85% Coverage
 
 ```bash
-source .venv/bin/activate && pytest tests/ -q --tb=no
+source .venv/bin/activate && pytest tests/ -q --tb=no --cov=src/corrdata --cov-report=term --cov-fail-under=85
 ```
 
 - [ ] Exit code is 0 (all tests pass)
 - [ ] No failures in output
+- [ ] Coverage is at least 85%
 
 Update: `pre_flight_checklist.tests_passing = true/false`
+Update: `pre_flight_checklist.coverage_percentage = <actual percentage>`
 
 ### 2. Database Migrations Verified
 
