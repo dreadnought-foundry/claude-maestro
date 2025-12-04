@@ -19,6 +19,9 @@ downloads/
 # Project-specific state (tracked per-project, not globally)
 projects/
 
+# Sprint state files (these belong in project repos, not global)
+sprint-*-state.json
+
 # Old session data
 session_tickets/
 terminal_tickets/
