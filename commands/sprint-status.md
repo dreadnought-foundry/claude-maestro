@@ -5,7 +5,7 @@ allowed-tools: [Read, Glob]
 
 # Sprint Status
 
-Check sprint progress by reading the state file.
+Check sprint progress by reading the state file and YAML frontmatter.
 
 **NOTE**: This workflow supports multiple concurrent sprints. Each sprint has its own state file: `.claude/sprint-{N}-state.json`
 
@@ -22,11 +22,23 @@ If `$ARGUMENTS` is empty:
 - If only one found, use that one
 - If none found, report "No active sprint. Use /sprint-start <N> to begin."
 
-### 2. Read Sprint Steps
+### 2. Read Sprint File and Frontmatter
+
+Read the sprint file from the path in state file and extract YAML frontmatter:
+- `sprint`: Sprint number
+- `title`: Sprint title
+- `status`: Current status (in-progress, done, blocked, aborted)
+- `started`: ISO timestamp when started
+- `completed`: ISO timestamp when completed (if done)
+- `hours`: Calculated hours worked
+- `blocked_at` / `aborted_at`: Timestamps if applicable
+- `blocker` / `abort_reason`: Reasons if applicable
+
+### 3. Read Sprint Steps
 
 Read `~/.claude/sprint-steps.json` to get step names
 
-### 3. Display Status
+### 4. Display Status
 
 Display status in this format:
 

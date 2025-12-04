@@ -133,31 +133,56 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
 
 ## If All Checks Pass
 
-1. Update sprint file:
-   - Set Status: "Complete"
-   - Set Completed: today's date
+1. **Calculate hours worked**:
+   - Read the `started` timestamp from YAML frontmatter
+   - Current time minus started time = hours (decimal, e.g., 5.25)
+
+2. **Update YAML frontmatter** in sprint file:
+   ```yaml
+   ---
+   sprint: N
+   title: <title>
+   status: done
+   started: <original timestamp>
+   completed: <current ISO 8601 timestamp with time>
+   hours: <calculated hours as decimal>
+   ---
+   ```
+
+3. **Update the sprint file's markdown table** (if present):
+   - Set `| **Status** |` to `Complete`
+   - Set `| **Completed** |` to current date/time
    - Check off all checklist items
 
-2. Update `docs/sprints/README.md`:
-   - Add sprint to completed list
+4. **Rename and move sprint file to `done/` folder**:
+   - Add completion date suffix to filename
+   - Format: `sprint-NN_title_done-YYYY-MM-DD.md`
+   - Example: `sprint-18_mcp-modular-architecture_done-2025-12-02.md`
+   ```bash
+   mv docs/sprints/in-progress/sprint-$ARGUMENTS*.md docs/sprints/done/sprint-$ARGUMENTS_<slug>_done-<YYYY-MM-DD>.md
+   ```
+
+5. **Update `docs/sprints/README.md`**:
+   - Add sprint to completed list with hours tracked
    - Update statistics if present
 
-3. Update state file `.claude/sprint-$ARGUMENTS-state.json`:
+6. **Update state file** `.claude/sprint-$ARGUMENTS-state.json`:
    - `status` = "complete"
    - `completed_at` = current ISO timestamp
 
-4. Report success:
+7. **Report success**:
    ```
    Sprint $ARGUMENTS: <title> - COMPLETE
 
    Pre-Flight Checklist: 9/9 passed
 
    Summary:
-   - Started: <date>
-   - Completed: <date>
-   - Duration: <time>
+   - Started: <timestamp>
+   - Completed: <timestamp>
+   - Hours: <calculated hours>
    - Steps completed: <count>
 
+   Sprint file moved to: docs/sprints/done/<new filename>
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
    Ready for next sprint? Use /sprint-start <N+1>
    ```

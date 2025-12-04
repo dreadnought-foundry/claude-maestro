@@ -1,13 +1,13 @@
 ---
-description: "Abort current sprint with reason"
-allowed-tools: [Read, Write, Edit, Glob]
+description: "Abort current sprint (cancelled, won't be completed)"
+allowed-tools: [Read, Write, Edit, Bash, Glob]
 ---
 
 # Abort Sprint
 
-Mark a sprint as aborted and preserve state for reference.
+Mark a sprint as aborted (cancelled, won't be completed).
 
-**NOTE**: This workflow supports multiple concurrent sprints. You MUST specify the sprint number.
+**NOTE**: If the sprint is temporarily blocked and will resume later, use `/sprint-blocked` instead.
 
 ## Instructions
 
@@ -17,7 +17,7 @@ Mark a sprint as aborted and preserve state for reference.
 
 Examples:
 - `34 Requirements changed, need to re-plan`
-- `35 Blocked by external dependency`
+- `36 Feature no longer needed`
 
 If only a reason is provided (no number):
 - Use Glob to find all sprint state files: `.claude/sprint-*-state.json`
@@ -40,7 +40,10 @@ No active sprint {N} to abort. Use /sprint-status to see active sprints.
 
 Before aborting, confirm:
 ```
-Are you sure you want to abort Sprint N: <title>?
+Are you sure you want to ABORT Sprint N: <title>?
+
+This means the sprint is CANCELLED and won't be completed.
+If this is a temporary blocker, use /sprint-blocked instead.
 
 Current progress:
 - Phase: X of 6
@@ -49,44 +52,78 @@ Current progress:
 
 Reason for abort: <reason>
 
-Type "yes" to confirm abort, or provide a different action.
+Type "yes" to confirm abort.
 ```
 
-### 4. Update State File
+### 4. Calculate Hours Worked
 
-If user confirms, update `.claude/sprint-{N}-state.json`:
+- Read the `started` timestamp from YAML frontmatter
+- Current time minus started time = hours (decimal)
+- This tracks time invested even for cancelled sprints
+
+### 5. Update Sprint File Metadata
+
+Update YAML frontmatter:
+```yaml
+---
+sprint: N
+title: <title>
+status: aborted
+started: <original timestamp>
+aborted_at: <current ISO 8601 timestamp>
+hours: <calculated hours>
+abort_reason: "<reason>"
+completed: null
+---
+```
+
+Update the markdown table (if present):
+- Set `| **Status** |` to `Aborted`
+- Add note: "Aborted on <date>: <reason>"
+
+### 6. Move Sprint File to Aborted Folder
+
+```bash
+mv docs/sprints/in-progress/sprint-{N}*.md docs/sprints/aborted/
+```
+
+### 7. Update State File
+
+Update `.claude/sprint-{N}-state.json`:
 
 ```json
 {
   "status": "aborted",
-  "completed_at": "<current ISO timestamp>",
+  "aborted_at": "<current ISO timestamp>",
   "abort_reason": "<reason>"
 }
 ```
 
 Keep all other fields intact for audit trail.
 
-### 5. Update Sprint File
+### 8. Update README
 
-Edit the sprint planning file:
-- Set Status: "Aborted"
-- Add note: "Aborted on <date>: <reason>"
+Update `docs/sprints/README.md`:
+- Add sprint to the Aborted section
+- Include hours worked and reason
 
-### 6. Report
+### 9. Report
 
 ```
 Sprint N: <title> - ABORTED
 
 Reason: <reason>
+Hours invested: <hours>
 
-Progress preserved:
-- Steps completed: <list>
+Progress at abort:
+- Phase: X of 6
+- Steps completed: <count>
 - Current step was: <step>
 
+Sprint file moved to: docs/sprints/aborted/
 State file preserved at .claude/sprint-{N}-state.json for reference.
 
 To start a new sprint: /sprint-start <N>
-To resume this sprint: Manually edit state file and set status to "in_progress"
 ```
 
 ---
@@ -100,6 +137,6 @@ To resume this sprint: Manually edit state file and set status to "in_progress"
 Examples:
 ```
 /sprint-abort 34 Requirements changed, need to re-plan
-/sprint-abort 35 Blocked by external dependency
-/sprint-abort 36 User requested pivot to different priority
+/sprint-abort 36 Feature no longer needed after customer feedback
+/sprint-abort 37 Superseded by sprint 38
 ```

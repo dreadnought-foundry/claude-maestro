@@ -1,6 +1,6 @@
 ---
 description: "Initialize a sprint - creates state file, spawns Plan agent"
-allowed-tools: [Read, Write, Glob, Task, TodoWrite, AskUserQuestion]
+allowed-tools: [Read, Write, Edit, Bash, Glob, Task, TodoWrite, AskUserQuestion]
 ---
 
 # Start Sprint $ARGUMENTS
@@ -11,19 +11,44 @@ You are initializing Sprint **$ARGUMENTS**. Follow these steps exactly in order.
 
 ## Step 1.1: Find and Read Sprint File
 
-1. Use Glob to find the sprint file:
+1. Use Glob to find the sprint file in any folder:
    ```
-   docs/sprints/sprint-$ARGUMENTS*.md
+   docs/sprints/**/sprint-$ARGUMENTS*.md
    ```
 
 2. Read the sprint planning file completely
 
 3. Extract from the file:
-   - Sprint title (from the header)
+   - Sprint title (from the header or YAML frontmatter)
    - Description
    - Dependencies
    - Main tasks/goals
    - Any open questions or ambiguities
+
+## Step 1.1a: Move Sprint File and Set Metadata
+
+1. **Move the sprint file to `in-progress/` folder** (if not already there):
+   ```bash
+   mv docs/sprints/todo/sprint-$ARGUMENTS*.md docs/sprints/in-progress/
+   ```
+
+2. **Add or update YAML frontmatter** at the top of the sprint file with:
+   ```yaml
+   ---
+   sprint: $ARGUMENTS
+   title: <extracted title>
+   status: in-progress
+   started: <current ISO 8601 timestamp with time, e.g., 2025-12-03T14:30:00>
+   completed: null
+   hours: null
+   ---
+   ```
+
+   If the file already has a markdown table with metadata (Status, Started, etc.), keep it but ensure the YAML frontmatter is added at the very top of the file.
+
+3. **Update the sprint file's markdown table** (if present):
+   - Set `| **Status** |` to `In Progress`
+   - Set `| **Started** |` to current timestamp
 
 ## Step 1.2: Create State File
 
