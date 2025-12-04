@@ -27,12 +27,25 @@ You are initializing Sprint **$ARGUMENTS**. Follow these steps exactly in order.
 
 ## Step 1.1a: Move Sprint File and Set Metadata
 
+**CRITICAL: You MUST use the Bash tool to move the file. Do not skip this step.**
+
 1. **Move the sprint file to `in-progress/` folder** (if not already there):
    ```bash
    mv docs/sprints/todo/sprint-$ARGUMENTS*.md docs/sprints/in-progress/
    ```
 
-2. **Add or update YAML frontmatter** at the top of the sprint file with:
+2. **VALIDATE the move succeeded** - Use Glob to confirm file is in in-progress/:
+   ```
+   docs/sprints/in-progress/sprint-$ARGUMENTS*.md
+   ```
+
+   **If the file is NOT found in `in-progress/`**, STOP and report the error:
+   ```
+   ERROR: Failed to move sprint file to in-progress/.
+   Please check if the file exists and try again.
+   ```
+
+3. **Add or update YAML frontmatter** at the top of the sprint file (now in in-progress/) with:
    ```yaml
    ---
    sprint: $ARGUMENTS
@@ -46,9 +59,16 @@ You are initializing Sprint **$ARGUMENTS**. Follow these steps exactly in order.
 
    If the file already has a markdown table with metadata (Status, Started, etc.), keep it but ensure the YAML frontmatter is added at the very top of the file.
 
-3. **Update the sprint file's markdown table** (if present):
+4. **Update the sprint file's markdown table** (if present):
    - Set `| **Status** |` to `In Progress`
    - Set `| **Started** |` to current timestamp
+
+5. **VALIDATE the YAML frontmatter** - Read the first 10 lines of the file and confirm:
+   - File starts with `---`
+   - Contains `status: in-progress`
+   - Contains `started:` with a timestamp
+
+   **If validation fails**, STOP and fix before proceeding.
 
 ## Step 1.2: Create State File
 
