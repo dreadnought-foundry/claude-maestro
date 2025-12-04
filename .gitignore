@@ -1,0 +1,25 @@
+# Sensitive files
+mcp.json
+settings.json
+settings.local.json
+.anthropic/
+
+# Transient/cache files
+history.jsonl
+debug/
+file-history/
+shell-snapshots/
+session-env/
+todos/
+plans/
+ide/
+statsig/
+downloads/
+
+# Project-specific state (tracked per-project, not globally)
+projects/
+
+# Old session data
+session_tickets/
+terminal_tickets/
+workspace_tickets/
