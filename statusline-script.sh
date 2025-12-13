@@ -19,6 +19,27 @@ else
     git_info=""
 fi
 
+# Check for sprint state
+sprint_state_file="$current_dir/.claude/sprint-state.json"
+if [[ -f "$sprint_state_file" ]]; then
+    sprint_num=$(jq -r '.sprint_number // empty' "$sprint_state_file" 2>/dev/null)
+    sprint_step=$(jq -r '.current_step // empty' "$sprint_state_file" 2>/dev/null)
+    sprint_status=$(jq -r '.status // empty' "$sprint_state_file" 2>/dev/null)
+
+    if [[ -n "$sprint_num" ]]; then
+        # Create compact sprint info
+        if [[ -n "$sprint_step" ]]; then
+            sprint_info=" [Sprint $sprint_num:$sprint_step]"
+        else
+            sprint_info=" [Sprint $sprint_num]"
+        fi
+    else
+        sprint_info=""
+    fi
+else
+    sprint_info=""
+fi
+
 # Check bypass permission status from settings.local.json
 settings_file="$HOME/.claude/settings.local.json"
 if [[ -f "$settings_file" ]]; then
@@ -76,10 +97,11 @@ else
 fi
 
 # Output the status line with colors
-# Cyan for model, Yellow for dir, default for git, Green for bypass, Magenta for MCP
-printf "\033[36m%s\033[0m in \033[33m%s\033[0m%s\033[32m%s\033[0m\033[35m%s\033[0m" \
+# Cyan for model, Yellow for dir, default for git, Blue for sprint, Green for bypass, Magenta for MCP
+printf "\033[36m%s\033[0m in \033[33m%s\033[0m%s\033[34m%s\033[0m\033[32m%s\033[0m\033[35m%s\033[0m" \
     "$model_name" \
     "$dir_name" \
     "$git_info" \
+    "$sprint_info" \
     "$bypass_info" \
     "$mcp_info"

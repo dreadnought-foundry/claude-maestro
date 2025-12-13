@@ -1,13 +1,23 @@
 ---
 description: "Show current sprint progress and next action"
-allowed-tools: [Read, Glob]
+allowed-tools: [Read, Glob, AgentOutputTool]
 ---
 
 # Sprint Status
 
-Check sprint progress by reading the state file and YAML frontmatter.
+Check sprint progress including parallel agent status.
 
-**NOTE**: This workflow supports multiple concurrent sprints. Each sprint has its own state file: `.claude/sprint-{N}-state.json`
+## BACKWARD COMPATIBILITY
+
+**Check `workflow_version` in state file:**
+- If missing or "1.0": Show legacy 6-phase status (no parallel agents section)
+- If "2.0" or "2.1": Show full v2.x status with parallel agents
+
+Existing sprints continue with their original workflow.
+
+---
+
+**Workflow Version**: 2.1
 
 ## Instructions
 
@@ -18,43 +28,90 @@ If `$ARGUMENTS` is provided:
 
 If `$ARGUMENTS` is empty:
 - Use Glob to find all sprint state files: `.claude/sprint-*-state.json`
-- If multiple found, list them and ask user which one to show status for
+- If multiple found, list summary and ask which one
 - If only one found, use that one
 - If none found, report "No active sprint. Use /sprint-start <N> to begin."
 
-### 2. Read Sprint File and Frontmatter
+### 2. Read State and Sprint File
 
-Read the sprint file from the path in state file and extract YAML frontmatter:
-- `sprint`: Sprint number
-- `title`: Sprint title
-- `status`: Current status (in-progress, done, blocked, aborted)
-- `started`: ISO timestamp when started
-- `completed`: ISO timestamp when completed (if done)
-- `hours`: Calculated hours worked
-- `blocked_at` / `aborted_at`: Timestamps if applicable
-- `blocker` / `abort_reason`: Reasons if applicable
+1. Read state file for:
+   - `current_phase`, `current_step`
+   - `workflow_version`
+   - `team_strategy`
+   - `parallel_agents` (if Phase 2)
+   - `completed_steps`
+   - `pre_flight_checklist`
 
-### 3. Read Sprint Steps
+2. Read sprint file YAML frontmatter for:
+   - `status`, `started`, `completed`
 
-Read `~/.claude/sprint-steps.json` to get step names
+### 3. Check Parallel Agent Status (Phase 2 Only)
+
+If `current_phase == 2` and `parallel_agents` exists:
+
+For each agent in `parallel_agents`:
+```
+result = AgentOutputTool(agent_id=agent.agent_id, block=false)
+agent.status = result.status  # running, complete, error
+agent.last_output = last_lines(result.output, 5)
+```
+
+Parse agent output for STATUS/ISSUES markers.
 
 ### 4. Display Status
-
-Display status in this format:
 
 ---
 
 ## Sprint $sprint_number: $sprint_title
 
-**Status:** $status
+**Status:** $status | **Workflow:** v$workflow_version
 **Started:** $started_at
 **Sprint File:** $sprint_file
-**State File:** .claude/sprint-$sprint_number-state.json
 
-### Progress
+---
 
-**Current Phase:** $current_phase of 6 - $phase_name
-**Current Step:** $current_step - $step_name
+### Phase Progress
+
+```
+Phase 1: Planning      [####----] Step 1.$step
+Phase 2: Implementation [--------]
+Phase 3: Validation     [--------]
+Phase 4: Complete       [--------]
+```
+
+**Current:** Phase $current_phase - Step $current_step: $step_name
+
+---
+
+### Team Strategy
+
+**Type:** $sprint_type
+**Parallelism:** $parallel_enabled
+**TDD Approach:** $tdd_approach
+
+| Role | Agent | Files Owned | Skills |
+|------|-------|-------------|--------|
+$for_each_team_member
+
+---
+
+### Parallel Agents (Phase 2)
+
+*Only shown during Phase 2 implementation*
+
+| ID | Role | Status | Progress | Last Update |
+|----|------|--------|----------|-------------|
+| $agent_id | $role | $status | $progress_summary | $last_update |
+
+**Issues Reported:**
+- $agent_id: $issue (or "None")
+
+**Recent Activity:**
+```
+$last_5_lines_from_each_agent
+```
+
+---
 
 ### Completed Steps
 
@@ -62,52 +119,54 @@ Display status in this format:
 |------|------|-----------|-------|
 $for_each_completed_step
 
+---
+
 ### Next Action
 
-**Step $next_action.step:** $next_action.description
+**Step $next_step:** $next_description
 
-$if_required_agent: Required Agent: `$next_action.required_agent`
+$if_parallel: "Parallel agents running. Use `/sprint-status $N` to refresh."
+$if_gate: "Waiting for user approval."
+$if_normal: "Use `/sprint-next $N` to advance."
+
+---
 
 ### Pre-Flight Checklist
 
 | Item | Status |
 |------|--------|
-| Tests passing | $checklist_icon |
-| Migrations verified | $checklist_icon |
-| Sample data generated | $checklist_icon |
-| MCP tools tested | $checklist_icon |
-| Dialog example created | $checklist_icon |
-| Sprint file updated | $checklist_icon |
-| Code has docstrings | $checklist_icon |
-| No hardcoded secrets | $checklist_icon |
-| Git status clean | $checklist_icon |
-
-$if_blockers:
-### Blockers
-$for_each_blocker
-
-$if_test_results:
-### Latest Test Results
-- Passed: $test_results.passed
-- Failed: $test_results.failed
-- Skipped: $test_results.skipped
-- Last run: $test_results.last_run
+| Tests passing | $icon |
+| Coverage >= 75% | $icon |
+| Migrations verified | $icon |
+| Lint clean | $icon |
+| User approved | $icon |
 
 ---
 
-**Tip:** Use `/sprint-next $sprint_number` to advance after completing the current step.
+### Test Results (if available)
+
+- Passed: $passed
+- Failed: $failed
+- Coverage: $coverage%
+- Last run: $timestamp
 
 ---
 
 ## Showing All Active Sprints
 
-If user runs `/sprint-status all` or if multiple sprints are found:
+If `/sprint-status all`:
 
-List all active sprints in summary format:
+| Sprint | Title | Phase | Step | Agents | Status |
+|--------|-------|-------|------|--------|--------|
+| N | Title | 2/4 | 2.1 | 3 running | in_progress |
+| M | Title | 1/4 | 1.3 | - | planning |
 
-| Sprint | Title | Phase | Step | Status |
-|--------|-------|-------|------|--------|
-| N | Title | X/6 | Y.Z | in_progress |
-| M | Title | X/6 | Y.Z | in_progress |
+---
 
-Then prompt: "Use `/sprint-status <N>` for details on a specific sprint."
+## Quick Actions
+
+- `/sprint-next $N` - Advance to next step
+- `/sprint-status $N` - Refresh status (check agent progress)
+- `/sprint-postmortem $N` - Generate postmortem (after completion)
+- `/sprint-abort $N` - Abort sprint
+- `/sprint-blocked $N` - Mark as blocked

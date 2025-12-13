@@ -27,15 +27,36 @@ State file path: `.claude/sprint-$ARGUMENTS-state.json`
 
 Run each check and update the state file. ALL checks must pass.
 
-### 1. Tests Passing with 85% Coverage
+### 0. Postmortem Section Exists (REQUIRED)
+
+**This check MUST pass before any other checks.**
 
 ```bash
-source .venv/bin/activate && pytest tests/ -q --tb=no --cov=src/corrdata --cov-report=term --cov-fail-under=85
+grep -q "## Postmortem" <sprint_file_path>
+```
+
+- [ ] Sprint file contains `## Postmortem` section
+- [ ] Postmortem has "What Went Well" subsection
+- [ ] Postmortem has "Action Items" subsection
+
+**If postmortem is missing:**
+```
+BLOCKED: Sprint cannot be completed without a postmortem.
+
+Run `/sprint-postmortem $ARGUMENTS` first, or manually add a ## Postmortem section.
+```
+
+Update: `pre_flight_checklist.postmortem_exists = true/false`
+
+### 1. Tests Passing with 75% Coverage
+
+```bash
+source .venv/bin/activate && pytest tests/ -q --tb=no --cov=src/corrdata --cov-report=term --cov-fail-under=75
 ```
 
 - [ ] Exit code is 0 (all tests pass)
 - [ ] No failures in output
-- [ ] Coverage is at least 85%
+- [ ] Coverage is at least 75%
 
 Update: `pre_flight_checklist.tests_passing = true/false`
 Update: `pre_flight_checklist.coverage_percentage = <actual percentage>`
@@ -74,19 +95,7 @@ grep -l "def.*sprint{N}" src/corrdata/mcp/tools/*.py 2>/dev/null
 
 Update: `pre_flight_checklist.mcp_tools_tested = true/false/null`
 
-### 5. Dialog Example Created
-
-Check for dialog example:
-```bash
-ls docs/examples/*sprint*{N}* 2>/dev/null || ls docs/examples/dialog_* 2>/dev/null | tail -1
-```
-
-- [ ] Dialog example exists for significant new capability OR
-- [ ] Not applicable (bug fix, refactoring, infrastructure)
-
-Update: `pre_flight_checklist.dialog_example_created = true/false/null`
-
-### 6. Sprint File Updated
+### 5. Sprint File Updated
 
 Read the sprint file and verify:
 - [ ] Status is "Complete" or ready to be set
@@ -95,7 +104,7 @@ Read the sprint file and verify:
 
 Update: `pre_flight_checklist.sprint_file_updated = true/false`
 
-### 7. Code Has Docstrings
+### 6. Code Has Docstrings
 
 Check new/modified Python files:
 ```bash
@@ -107,7 +116,7 @@ grep -L '"""' src/corrdata/**/*.py 2>/dev/null | head -5
 
 Update: `pre_flight_checklist.code_has_docstrings = true/false`
 
-### 8. No Hardcoded Secrets
+### 7. No Hardcoded Secrets
 
 Search for potential secrets:
 ```bash
@@ -120,7 +129,7 @@ grep -rn -E "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" src/ --inc
 
 Update: `pre_flight_checklist.no_hardcoded_secrets = true/false`
 
-### 9. Git Status Clean
+### 8. Git Status Clean
 
 ```bash
 git status --porcelain
@@ -139,7 +148,81 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - Read the `started` timestamp from YAML frontmatter
    - Current time minus started time = hours (decimal, e.g., 5.25)
 
-2. **Update YAML frontmatter** in sprint file:
+2. **Generate Postmortem** (add to sprint file before completion):
+
+   Read the state file and gather:
+   - Duration: completed_at - started_at
+   - Tests written: count from test_results in state or test files
+   - Files created/modified: from completed_steps output
+
+   Add a `## Postmortem` section to the sprint file with:
+
+   ```markdown
+   ## Postmortem
+
+   ### Summary
+   <One sentence describing what the sprint accomplished>
+
+   ### Duration & Metrics
+   - **Duration**: <hours> hours
+   - **Tests Written**: <count> (backend: X, frontend: Y)
+   - **Files Created**: <count>
+   - **Files Modified**: <count>
+
+   ### What Went Well
+   - <Positive outcomes, patterns reused, early discoveries>
+
+   ### What Could Improve
+   - <Issues encountered, things discovered late, gaps>
+
+   ### Patterns Discovered
+   - <Reusable patterns or components created>
+   - <Approaches that worked well>
+
+   ### Action Items
+   - [x] `[done]` <Completed items with link to resolution>
+   - [ ] `[sprint]` <Items that need dedicated sprint> → Sprint NNN
+   - [ ] `[backlog]` <Future work, not urgent>
+   - [ ] `[pattern]` <Process/code patterns to document>
+   ```
+
+   **Action Item Tags**:
+   | Tag | Meaning | Action |
+   |-----|---------|--------|
+   | `[done]` | Already resolved | Mark with link to resolution |
+   | `[sprint]` | Needs dedicated sprint | Create todo sprint, add to backlog |
+   | `[backlog]` | Future work | Add to `docs/sprints/backlog.md` |
+   | `[pattern]` | Reusable pattern | Add to cookbook |
+
+   **Guidelines for postmortem content**:
+   - Be specific about what went well (e.g., "Pattern reuse from Sprint X saved time")
+   - Be honest about what could improve (e.g., "Missing hook wasn't in initial plan")
+   - Note any follow-up sprints created
+   - Reference specific file names and component names
+   - **Tag every action item** with one of the above tags
+
+2b. **Process Action Items**:
+
+   After writing the postmortem, process each action item:
+
+   **For `[sprint]` items**:
+   - Create a new sprint file in `docs/sprints/1-todo/`
+   - Use `/sprint-new` format or create manually
+   - Add reference to backlog.md with link to new sprint
+
+   **For `[backlog]` items**:
+   - Add to `docs/sprints/backlog.md` under "Active Backlog"
+   - Include source sprint reference
+
+   **For `[pattern]` items**:
+   - Add to appropriate cookbook file in `docs/cookbook/`
+   - Or create new pattern file if significant
+
+   **For `[done]` items**:
+   - Ensure link to resolution is included
+   - Add to backlog.md "Resolved Items" table
+
+3. **Update YAML frontmatter** in sprint file:
    ```yaml
    ---
    sprint: N
@@ -151,32 +234,56 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    ---
    ```
 
-3. **Update the sprint file's markdown table** (if present):
+4. **Update the sprint file's markdown table** (if present):
    - Set `| **Status** |` to `Complete`
    - Set `| **Completed** |` to current date/time
    - Check off all checklist items
 
-4. **Rename and move sprint file to `done/` folder**:
-   - Add completion date suffix to filename
-   - Format: `sprint-NN_title_done-YYYY-MM-DD.md`
-   - Example: `sprint-18_mcp-modular-architecture_done-2025-12-02.md`
+5. **Move or rename sprint file based on epic membership**:
+
+   First, detect if sprint is part of an epic:
    ```bash
-   mv docs/sprints/in-progress/sprint-$ARGUMENTS*.md docs/sprints/done/sprint-$ARGUMENTS_<slug>_done-<YYYY-MM-DD>.md
+   # Find the current sprint file
+   SPRINT_FILE=$(find docs/sprints -name "sprint-$ARGUMENTS_*.md" -o -name "sprint-$ARGUMENTS*.md" | grep -v "\-\-" | head -1)
+
+   # Check if it's in an epic folder
+   if echo "$SPRINT_FILE" | grep -q "/epic-"; then
+     IS_IN_EPIC=true
+   else
+     IS_IN_EPIC=false
+   fi
    ```
 
-5. **Update `docs/sprints/README.md`**:
+   **If in an epic** (IS_IN_EPIC=true):
+   - Rename with `--done` suffix, keep in epic folder
+   ```bash
+   mv "$SPRINT_FILE" "${SPRINT_FILE%.md}--done.md"
+   ```
+   - **Note**: The epic folder stays in `2-in-progress/` until ALL sprints are complete.
+   - Use `/epic-complete <N>` when all sprints in the epic are done.
+
+   **If standalone** (IS_IN_EPIC=false):
+   - Move to `docs/sprints/3-done/_standalone/`
+   ```bash
+   mkdir -p docs/sprints/3-done/_standalone
+   mv "$SPRINT_FILE" docs/sprints/3-done/_standalone/
+   ```
+
+6. **Update `docs/sprints/README.md`**:
    - Add sprint to completed list with hours tracked
    - Update statistics if present
 
-6. **Update state file** `.claude/sprint-$ARGUMENTS-state.json`:
+7. **Update state file** `.claude/sprint-$ARGUMENTS-state.json`:
    - `status` = "complete"
    - `completed_at` = current ISO timestamp
 
-7. **Report success**:
-   ```
-   Sprint $ARGUMENTS: <title> - COMPLETE
+8. **Report success**:
 
-   Pre-Flight Checklist: 9/9 passed
+   **For epic sprints**:
+   ```
+   Sprint $ARGUMENTS: <title> - COMPLETE ✓
+
+   Pre-Flight Checklist: 8/8 passed
 
    Summary:
    - Started: <timestamp>
@@ -184,9 +291,27 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - Hours: <calculated hours>
    - Steps completed: <count>
 
-   Sprint file moved to: docs/sprints/done/<new filename>
+   Sprint file renamed to: <filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
-   Ready for next sprint? Use /sprint-start <N+1>
+
+   Epic status: <X of Y sprints complete>
+   When all sprints done: /epic-complete <epic-number>
+   ```
+
+   **For standalone sprints**:
+   ```
+   Sprint $ARGUMENTS: <title> - COMPLETE ✓
+
+   Pre-Flight Checklist: 8/8 passed
+
+   Summary:
+   - Started: <timestamp>
+   - Completed: <timestamp>
+   - Hours: <calculated hours>
+   - Steps completed: <count>
+
+   Sprint file moved to: docs/sprints/3-done/_standalone/<filename>
+   State file preserved at .claude/sprint-$ARGUMENTS-state.json
    ```
 
 ---

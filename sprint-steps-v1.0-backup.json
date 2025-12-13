@@ -1,5 +1,5 @@
 {
-  "version": "2.1",
+  "version": "2.0",
   "description": "Optimized sprint workflow with staged parallelism and flexible TDD",
   "philosophy": {
     "parallelism": "staged",
@@ -253,7 +253,6 @@
     "check-coverage",
     "run-migrations",
     "lint-fix",
-    "smoke-tests",
-    "build-pwa"
+    "generate-dialog"
   ]
 }

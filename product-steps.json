@@ -1,0 +1,557 @@
+{
+  "version": "1.0",
+  "description": "Product-to-Sprint workflow step definitions - from business drivers to executable sprints",
+  "phases": [
+    {
+      "phase": 0,
+      "name": "Foundation",
+      "description": "One-time service setup: vision and design system (run once per service)",
+      "run_once": true,
+      "steps": [
+        {
+          "step": "0.1",
+          "name": "Service Vision",
+          "description": "Define the overall service purpose, audience, and value proposition",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "service_name",
+              "question": "What is the name of this service/platform?",
+              "type": "text"
+            },
+            {
+              "id": "service_purpose",
+              "question": "In 2-3 sentences, what does this service do and why does it exist?",
+              "type": "text"
+            },
+            {
+              "id": "target_audience",
+              "question": "Who are the primary users of this service? (List user types)",
+              "type": "text"
+            },
+            {
+              "id": "core_value",
+              "question": "What is the core value proposition? Why would someone choose this over alternatives?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/service-vision.md exists"
+          },
+          "outputs": ["docs/product/service-vision.md"]
+        },
+        {
+          "step": "0.2",
+          "name": "Design Brief",
+          "description": "Establish visual direction, principles, and mood for the service",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "brief_mode",
+              "question": "How would you like to complete the design brief?",
+              "type": "choice",
+              "options": [
+                "Interactive - Answer questions now",
+                "Questionnaire - I'll share with partners and bring answers back",
+                "Import - I have completed answers to paste in"
+              ]
+            }
+          ],
+          "facilitation": {
+            "interactive_flow": "design_brief_interactive",
+            "questionnaire_path": "~/.claude/docs/design-brief-questionnaire.md"
+          },
+          "validation": {
+            "type": "user_approval",
+            "check": "Design brief reviewed and approved"
+          },
+          "outputs": ["docs/product/design/design-brief.md"],
+          "gate": true,
+          "gate_message": "Design brief must be approved before configuring design system"
+        },
+        {
+          "step": "0.3",
+          "name": "Design System Setup",
+          "description": "Configure shadcn/ui theme based on design brief decisions",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "shadcn_style",
+              "question": "Which shadcn style do you prefer?",
+              "type": "choice",
+              "options": ["Default", "New York"]
+            },
+            {
+              "id": "base_color",
+              "question": "Which base color palette? (Based on your design brief color direction)",
+              "type": "choice",
+              "options": ["Slate", "Gray", "Zinc", "Neutral", "Stone"]
+            },
+            {
+              "id": "radius",
+              "question": "Border radius preference?",
+              "type": "choice",
+              "options": ["0 (Sharp)", "0.3rem (Subtle)", "0.5rem (Medium)", "0.75rem (Rounded)", "1rem (Very rounded)"]
+            },
+            {
+              "id": "dark_mode",
+              "question": "Support dark mode?",
+              "type": "choice",
+              "options": ["Yes - Both light and dark", "No - Light only", "No - Dark only"]
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/design/shadcn-config.md exists"
+          },
+          "outputs": [
+            "docs/product/design/shadcn-config.md",
+            "docs/product/design/patterns/index.md"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 1,
+      "name": "Problem",
+      "description": "Understand the business need and define success for a product/feature",
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Problem Brief",
+          "description": "Capture business drivers, pain points, and opportunities",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "product_name",
+              "question": "What is the name of this product/feature?",
+              "type": "text"
+            },
+            {
+              "id": "product_type",
+              "question": "What type of product is this?",
+              "type": "choice",
+              "options": ["Core Platform", "Add-on Product", "Feature Enhancement", "Integration"]
+            },
+            {
+              "id": "problem_statement",
+              "question": "What problem does this solve? Who has this problem and how painful is it?",
+              "type": "text"
+            },
+            {
+              "id": "current_state",
+              "question": "How do users solve this problem today? What's wrong with that approach?",
+              "type": "text"
+            },
+            {
+              "id": "opportunity",
+              "question": "What's the opportunity? Why solve this now?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/products/{product_name}/problem-brief.md exists"
+          },
+          "outputs": ["docs/product/products/{product_name}/problem-brief.md"]
+        },
+        {
+          "step": "1.2",
+          "name": "User Research",
+          "description": "Define user personas, their goals, and pain points",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "user_types",
+              "question": "List the user types/personas who will use this product (comma separated)",
+              "type": "text"
+            },
+            {
+              "id": "primary_user",
+              "question": "Which user type is the PRIMARY user (most important to satisfy)?",
+              "type": "text"
+            },
+            {
+              "id": "user_goals",
+              "question": "For each user type, what are their top 2-3 goals when using this product?",
+              "type": "text"
+            },
+            {
+              "id": "user_frustrations",
+              "question": "What frustrations or pain points do these users experience with current solutions?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/products/{product_name}/user-research.md exists"
+          },
+          "outputs": ["docs/product/products/{product_name}/user-research.md"]
+        },
+        {
+          "step": "1.3",
+          "name": "Success Metrics",
+          "description": "Define measurable outcomes that indicate success",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "success_definition",
+              "question": "How will you know this product is successful? What does 'good' look like?",
+              "type": "text"
+            },
+            {
+              "id": "key_metrics",
+              "question": "What 2-4 metrics will you track to measure success?",
+              "type": "text"
+            },
+            {
+              "id": "targets",
+              "question": "What are the target values for these metrics? (Can be ranges or estimates)",
+              "type": "text"
+            },
+            {
+              "id": "timeline",
+              "question": "By when should these metrics be achieved?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "user_approval",
+            "check": "Problem phase complete - user confirmed understanding is correct"
+          },
+          "outputs": ["docs/product/products/{product_name}/success-metrics.md"],
+          "gate": true,
+          "gate_message": "Problem definition must be approved before moving to solution"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Solution",
+      "description": "Translate business needs into product requirements and UI specifications",
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Solution Spec",
+          "description": "Define the solution approach, features, and constraints",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "solution_approach",
+              "question": "At a high level, how will this product solve the problem?",
+              "type": "text"
+            },
+            {
+              "id": "core_features",
+              "question": "What are the core features (must-haves) for the first version?",
+              "type": "text"
+            },
+            {
+              "id": "nice_to_haves",
+              "question": "What features are nice-to-have but not essential for v1?",
+              "type": "text"
+            },
+            {
+              "id": "out_of_scope",
+              "question": "What is explicitly out of scope (to avoid scope creep)?",
+              "type": "text"
+            },
+            {
+              "id": "constraints",
+              "question": "What technical or business constraints must the solution respect?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/products/{product_name}/solution-spec.md exists"
+          },
+          "outputs": ["docs/product/products/{product_name}/solution-spec.md"]
+        },
+        {
+          "step": "2.2",
+          "name": "User Stories",
+          "description": "Create user stories for each feature with acceptance criteria",
+          "agent": "product-engineer",
+          "agent_instructions": "Generate user stories from the solution spec. Format: 'As a [user type], I want to [action] so that [benefit]'. Include acceptance criteria for each story.",
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/products/{product_name}/user-stories.md exists"
+          },
+          "outputs": ["docs/product/products/{product_name}/user-stories.md"]
+        },
+        {
+          "step": "2.3",
+          "name": "Acceptance Criteria",
+          "description": "Refine and detail acceptance criteria for testability",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "review_stories",
+              "question": "I've generated user stories. Please review and let me know if any need adjustment.",
+              "type": "confirmation"
+            },
+            {
+              "id": "edge_cases",
+              "question": "Are there edge cases or error scenarios we should explicitly cover in acceptance criteria?",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_content",
+            "check": "user-stories.md has acceptance criteria for all stories"
+          },
+          "outputs": ["docs/product/products/{product_name}/user-stories.md"]
+        },
+        {
+          "step": "2.4",
+          "name": "UI/UX Spec",
+          "description": "Define screens, user flows, and component mappings",
+          "agent": "product-engineer",
+          "agent_instructions": "Based on user stories, create UI specification including: screen inventory, user flows (mermaid diagrams), and component mapping to shadcn/ui components. Reference the design system in docs/product/design/.",
+          "validation": {
+            "type": "files_exist",
+            "check": "ui-spec/screens.md and ui-spec/flows.md exist"
+          },
+          "outputs": [
+            "docs/product/products/{product_name}/ui-spec/screens.md",
+            "docs/product/products/{product_name}/ui-spec/flows.md",
+            "docs/product/products/{product_name}/ui-spec/component-mapping.md"
+          ]
+        },
+        {
+          "step": "2.5",
+          "name": "Design Review",
+          "description": "Review UI specification with stakeholders",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "review_ui",
+              "question": "Please review the UI specification (screens, flows, component mapping). Take your time - this gates sprint generation.",
+              "type": "confirmation"
+            },
+            {
+              "id": "design_feedback",
+              "question": "Do you have feedback or changes needed? (Enter 'approved' if ready to proceed)",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "user_approval",
+            "check": "UI specification approved"
+          },
+          "outputs": [],
+          "gate": true,
+          "gate_message": "Design must be approved before generating sprints"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Execution",
+      "description": "Break requirements into sprints ready for implementation",
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Sprint Breakdown",
+          "description": "Decompose user stories into sprint-sized work units",
+          "agent": "Plan",
+          "agent_instructions": "Analyze user stories and UI spec. Group related work into sprints of roughly equal size. Each sprint should deliver demonstrable value. Consider dependencies between features.",
+          "validation": {
+            "type": "state_field",
+            "check": "sprint_breakdown exists with sprint definitions"
+          },
+          "outputs": ["sprint_breakdown"]
+        },
+        {
+          "step": "3.2",
+          "name": "Prioritize",
+          "description": "Order sprints by dependency and value",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "review_breakdown",
+              "question": "Here's the proposed sprint breakdown. Review the grouping and order.",
+              "type": "confirmation"
+            },
+            {
+              "id": "priority_adjustment",
+              "question": "Should any sprints be reordered or regrouped? (Enter 'approved' if order is good)",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "file_exists",
+            "check": "docs/product/products/{product_name}/sprint-roadmap.md exists"
+          },
+          "outputs": ["docs/product/products/{product_name}/sprint-roadmap.md"]
+        },
+        {
+          "step": "3.3",
+          "name": "Generate Sprints",
+          "description": "Create sprint planning files ready for /sprint-start",
+          "agent": "file-creator",
+          "agent_instructions": "For each sprint in the roadmap, create a sprint file in docs/sprints/1-todo/<epic-folder>/ following the project's sprint template format. Include: frontmatter, goal, tasks table, definition of done.",
+          "validation": {
+            "type": "files_exist",
+            "check": "Sprint files exist in docs/sprints/1-todo/"
+          },
+          "outputs": ["docs/sprints/1-todo/<epic-folder>/sprint-{N}_*.md"],
+          "gate": true,
+          "gate_message": "Sprint files must be reviewed before marking product planning complete"
+        },
+        {
+          "step": "3.4",
+          "name": "Review & Approve",
+          "description": "Final review of sprint sequence before execution",
+          "interactive": true,
+          "prompts": [
+            {
+              "id": "review_sprints",
+              "question": "Sprint files have been generated. Please review them in docs/sprints/1-todo/",
+              "type": "confirmation"
+            },
+            {
+              "id": "final_approval",
+              "question": "Are the sprints ready for execution? (Enter 'approved' to complete product planning)",
+              "type": "text"
+            }
+          ],
+          "validation": {
+            "type": "user_approval",
+            "check": "Sprints approved and ready for execution"
+          },
+          "outputs": []
+        }
+      ]
+    }
+  ],
+  "step_order": [
+    "0.1", "0.2", "0.3",
+    "1.1", "1.2", "1.3",
+    "2.1", "2.2", "2.3", "2.4", "2.5",
+    "3.1", "3.2", "3.3", "3.4"
+  ],
+  "gates": {
+    "foundation_complete": {
+      "after_step": "0.3",
+      "description": "Service vision and design system established",
+      "required_for": "Starting any product"
+    },
+    "problem_approved": {
+      "after_step": "1.3",
+      "description": "Problem definition approved",
+      "required_for": "Phase 2"
+    },
+    "design_approved": {
+      "after_step": "2.5",
+      "description": "Solution and UI specification approved",
+      "required_for": "Phase 3"
+    },
+    "sprints_ready": {
+      "after_step": "3.4",
+      "description": "Sprints generated and approved",
+      "required_for": "Sprint execution (/sprint-start)"
+    }
+  },
+  "interactive_flows": {
+    "design_brief_interactive": {
+      "description": "Interactive facilitation of design brief questions",
+      "sections": [
+        {
+          "name": "Users & Context",
+          "prompts": [
+            {
+              "id": "user_types",
+              "question": "Who are your primary users? List each type with their role.",
+              "type": "text"
+            },
+            {
+              "id": "usage_context",
+              "question": "For each user, describe: Device (mobile/desktop), Environment (office/field), Time pressure (low/medium/high)",
+              "type": "text"
+            },
+            {
+              "id": "accessibility",
+              "question": "Accessibility requirements? (WCAG level, special needs like outdoor visibility, screen reader support)",
+              "type": "text"
+            },
+            {
+              "id": "constraints",
+              "question": "Technical constraints? (offline support, low bandwidth, older devices, integrations)",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "name": "Brand & Personality",
+          "prompts": [
+            {
+              "id": "personality",
+              "question": "Pick 3-5 adjectives that describe the product's personality (e.g., professional, friendly, minimal, reliable, modern)",
+              "type": "text"
+            },
+            {
+              "id": "user_feeling",
+              "question": "What should users FEEL when using this? (confident, efficient, safe, empowered, calm, focused)",
+              "type": "text"
+            },
+            {
+              "id": "avoid",
+              "question": "What should it NOT feel like? (cheap, complex, cold, dated, cluttered)",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "name": "Visual Direction",
+          "prompts": [
+            {
+              "id": "color_direction",
+              "question": "Color direction preference?\n  A) Trust Blue - stable, professional\n  B) Action Green - growth, safety\n  C) Neutral Foundation - flexible, content-focused\n  D) Bold Accent - modern, distinctive",
+              "type": "choice",
+              "options": ["A", "B", "C", "D"]
+            },
+            {
+              "id": "density",
+              "question": "Information density preference?\n  Mobile: Comfortable / Default / Compact\n  Desktop: Comfortable / Default / Compact",
+              "type": "text"
+            },
+            {
+              "id": "complexity",
+              "question": "Visual complexity (1-10)? 1-3=Minimal, 4-6=Balanced, 7-10=Rich",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "name": "References",
+          "prompts": [
+            {
+              "id": "reference_products",
+              "question": "Name 2-4 products this should FEEL like, and why (e.g., 'Linear - clean but functional', 'Notion - flexible blocks')",
+              "type": "text"
+            },
+            {
+              "id": "anti_references",
+              "question": "Any products it should NOT feel like?",
+              "type": "text"
+            }
+          ]
+        },
+        {
+          "name": "Priorities",
+          "prompts": [
+            {
+              "id": "top_priority",
+              "question": "If you had to pick ONE priority for the UI: Speed, Clarity, Delight, Trust, Flexibility, or Accessibility?",
+              "type": "choice",
+              "options": ["Speed", "Clarity", "Delight", "Trust", "Flexibility", "Accessibility"]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

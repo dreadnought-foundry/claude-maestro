@@ -3,11 +3,15 @@
 Claude Code PreToolUse Hook
 Enhanced version with comprehensive agent context injection
 Migrated from custom hook system (CLAUD-1)
+
+Gates:
+- Sprint completion: Blocks moves to 3-done/ unless /sprint-complete was run
 """
 import json
 import sys
 import os
 import subprocess
+import re
 from pathlib import Path
 
 def main():
@@ -18,8 +22,21 @@ def main():
         print("Error: Invalid JSON input", file=sys.stderr)
         sys.exit(1)
 
-    # Check if this is a Task tool invocation
     tool_name = hook_data.get('tool_name', '')
+    tool_input = hook_data.get('tool_input', {})
+    project_root = Path(os.environ.get('CLAUDE_PROJECT_DIR', os.getcwd()))
+
+    # Gate: Check sprint completion before allowing moves to 3-done/
+    gate_result = check_sprint_completion_gate(tool_name, tool_input, project_root)
+    if 'hookSpecificOutput' in gate_result:
+        # Gate returned a denial - output it and exit
+        print(json.dumps(gate_result))
+        sys.exit(0)
+    elif not gate_result.get('continue', True):
+        print(json.dumps(gate_result))
+        sys.exit(0)
+
+    # Check if this is a Task tool invocation
     if tool_name != 'Task':
         # Not a Task tool call, continue normally
         sys.exit(0)
@@ -330,6 +347,108 @@ def detect_ci_provider():
             return provider
 
     return None
+
+
+# =============================================================================
+# SPRINT COMPLETION GATE
+# Blocks moves to 3-done/ unless /sprint-complete was properly run
+# =============================================================================
+
+def deny_with_reason(reason: str) -> dict:
+    """Return a properly formatted denial response for PreToolUse hooks."""
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason
+        }
+    }
+
+def check_sprint_completion_gate(tool_name, tool_input, project_root):
+    """
+    Gate that prevents moving sprint files to 3-done/ without proper completion.
+
+    Checks:
+    - Bash commands with 'mv' targeting '3-done/'
+    - Edit/Write operations on files in '3-done/' containing 'sprint-'
+
+    Allows if:
+    - State file exists with pre_flight_checklist showing completion
+    - Or if this appears to be the /sprint-complete command itself
+    """
+    target_path = None
+    sprint_number = None
+
+    # Check Bash mv commands
+    if tool_name == 'Bash':
+        command = tool_input.get('command', '')
+        # Look for mv commands targeting 3-done
+        if 'mv ' in command and '3-done' in command:
+            # Extract sprint number from command
+            match = re.search(r'sprint-(\d+)', command)
+            if match:
+                sprint_number = match.group(1)
+                target_path = command
+
+    # Check Edit/Write operations
+    elif tool_name in ('Edit', 'Write'):
+        file_path = tool_input.get('file_path', '')
+        if '3-done' in file_path and 'sprint-' in file_path:
+            match = re.search(r'sprint-(\d+)', file_path)
+            if match:
+                sprint_number = match.group(1)
+                target_path = file_path
+
+    # If no sprint operation detected, allow
+    if not sprint_number:
+        return {"continue": True}
+
+    # Check if sprint was properly completed
+    state_file = project_root / '.claude' / f'sprint-{sprint_number}-state.json'
+
+    if not state_file.exists():
+        return deny_with_reason(
+            f"SPRINT COMPLETION GATE: Cannot move Sprint {sprint_number} to 3-done/ - "
+            f"no state file found. Run `/sprint-complete {sprint_number}` first."
+        )
+
+    try:
+        with open(state_file, 'r') as f:
+            state = json.load(f)
+
+        # Check if pre-flight checklist was completed
+        checklist = state.get('pre_flight_checklist', {})
+        status = state.get('status', '')
+
+        # Allow if status is 'complete' and checklist shows completion
+        required_checks = [
+            'tests_passing',
+            'sprint_file_updated',
+            'no_hardcoded_secrets',
+            'git_status_clean'
+        ]
+
+        checks_passed = all(checklist.get(check) for check in required_checks)
+
+        if status == 'complete' and checks_passed:
+            # Sprint was properly completed, allow the operation
+            return {"continue": True}
+
+        # Not properly completed
+        failed_checks = [check for check in required_checks if not checklist.get(check)]
+
+        return deny_with_reason(
+            f"SPRINT COMPLETION GATE: Sprint {sprint_number} not properly completed. "
+            f"Status: {status}. Failed checks: {', '.join(failed_checks) if failed_checks else 'checklist not run'}. "
+            f"Run `/sprint-complete {sprint_number}` first."
+        )
+
+    except (json.JSONDecodeError, IOError) as e:
+        return deny_with_reason(
+            f"SPRINT COMPLETION GATE: Could not read state file for Sprint {sprint_number}: {e}. "
+            f"Run `/sprint-complete {sprint_number}` first."
+        )
+
 
 if __name__ == "__main__":
     main()

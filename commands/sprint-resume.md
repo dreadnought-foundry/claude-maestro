@@ -14,23 +14,23 @@ Resume a previously blocked sprint.
 `$ARGUMENTS` should contain the sprint number.
 
 If `$ARGUMENTS` is empty:
-- Use Glob to find sprint files in blocked folder: `docs/sprints/blocked/sprint-*.md`
+- Use Glob to find sprint files with `--blocked` suffix: `docs/sprints/**/sprint-*--blocked.md`
 - If multiple found, list them and ask user which one to resume
 - If only one found, use that sprint number
 - If none found, report "No blocked sprints to resume."
 
 ### 2. Find and Read Sprint File
 
-1. Use Glob to find the sprint file:
+1. Use Glob to find the sprint file with `--blocked` suffix:
    ```
-   docs/sprints/blocked/sprint-$ARGUMENTS*.md
+   docs/sprints/**/sprint-$ARGUMENTS*--blocked.md
    ```
 
 2. Read the sprint file and extract:
    - YAML frontmatter (started, blocked_at, hours_before_block, blocker)
    - Current state from state file
 
-If not found in blocked folder:
+If not found with `--blocked` suffix:
 ```
 Sprint {N} is not in blocked status. Use /sprint-status to check its current state.
 ```
@@ -70,11 +70,17 @@ Update the markdown table (if present):
 - Set `| **Status** |` to `In Progress`
 - Add note: "Resumed on <date> (was blocked: <reason>)"
 
-### 5. Move Sprint File Back to In-Progress
+### 5. Remove `--blocked` Suffix from Sprint File
 
 ```bash
-mv docs/sprints/blocked/sprint-{N}*.md docs/sprints/in-progress/
+# Find the blocked sprint file and remove the --blocked suffix
+BLOCKED_FILE=$(find docs/sprints -name "sprint-{N}*--blocked.md" | head -1)
+# Rename: sprint-72_search--blocked.md → sprint-72_search.md
+NEW_NAME="${BLOCKED_FILE%--blocked.md}.md"
+mv "$BLOCKED_FILE" "$NEW_NAME"
 ```
+
+**Note**: The file stays in the epic folder. Only the suffix is removed.
 
 ### 6. Update State File
 
@@ -108,7 +114,7 @@ Current progress:
 - Phase: X of 6
 - Current step: Y.Z
 
-Sprint file moved to: docs/sprints/in-progress/
+Sprint file renamed to: <filename>.md (removed --blocked suffix)
 
 Use /sprint-next <N> to continue from where you left off.
 Use /sprint-status <N> to see full progress details.

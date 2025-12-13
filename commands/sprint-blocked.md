@@ -81,11 +81,15 @@ Update the markdown table (if present):
 - Set `| **Status** |` to `Blocked`
 - Add note: "Blocked on <date>: <reason>"
 
-### 6. Move Sprint File to Blocked Folder
+### 6. Rename Sprint File with `--blocked` Suffix
 
 ```bash
-mv docs/sprints/in-progress/sprint-{N}*.md docs/sprints/blocked/
+# Keep in same epic folder, just rename with --blocked suffix
+SPRINT_FILE=$(find docs/sprints -name "sprint-{N}_*.md" -o -name "sprint-{N}*.md" | grep -v "\-\-" | head -1)
+mv "$SPRINT_FILE" "${SPRINT_FILE%.md}--blocked.md"
 ```
+
+**Note**: The file stays in the epic folder. The `--blocked` suffix indicates status.
 
 ### 7. Update State File
 
@@ -120,7 +124,7 @@ Progress preserved:
 - Steps completed: <count>
 - Current step: <step>
 
-Sprint file moved to: docs/sprints/blocked/
+Sprint file renamed to: <filename>--blocked.md
 State file preserved at .claude/sprint-{N}-state.json
 
 To resume when blocker is resolved: /sprint-resume <N>

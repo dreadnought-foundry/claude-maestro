@@ -81,11 +81,15 @@ Update the markdown table (if present):
 - Set `| **Status** |` to `Aborted`
 - Add note: "Aborted on <date>: <reason>"
 
-### 6. Move Sprint File to Aborted Folder
+### 6. Rename Sprint File with `--aborted` Suffix
 
 ```bash
-mv docs/sprints/in-progress/sprint-{N}*.md docs/sprints/aborted/
+# Keep in same epic folder, just rename with --aborted suffix
+SPRINT_FILE=$(find docs/sprints -name "sprint-{N}_*.md" -o -name "sprint-{N}*.md" | grep -v "\-\-" | head -1)
+mv "$SPRINT_FILE" "${SPRINT_FILE%.md}--aborted.md"
 ```
+
+**Note**: The file stays in the epic folder. The `--aborted` suffix indicates status.
 
 ### 7. Update State File
 
@@ -120,7 +124,7 @@ Progress at abort:
 - Steps completed: <count>
 - Current step was: <step>
 
-Sprint file moved to: docs/sprints/aborted/
+Sprint file renamed to: <filename>--aborted.md
 State file preserved at .claude/sprint-{N}-state.json for reference.
 
 To start a new sprint: /sprint-start <N>

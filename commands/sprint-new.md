@@ -9,11 +9,15 @@ Create a new sprint planning file for Sprint **$ARGUMENTS**.
 
 ## Instructions
 
-### 1. Determine Sprint Number and Title
+### 1. Determine Sprint Number, Title, and Epic
 
 Parse $ARGUMENTS:
 - If just a number (e.g., "5"), prompt user for title
 - If "5 Feature Name", use "5" as number and "Feature Name" as title
+- If includes "--epic=N", extract epic number N and remove from title
+- Example: "53 Photo Capture --epic=3" → Sprint 53, Title "Photo Capture", Epic 3
+
+Epic is optional - sprints can exist without an epic.
 
 ### 2. Check for Existing Sprints
 
@@ -47,6 +51,7 @@ Use this template:
 |-------|-------|
 | Sprint | {N} |
 | Title | {Title} |
+| Epic | {Epic number or "None"} |
 | Status | Planning |
 | Created | {TODAY} |
 | Started | - |
@@ -128,11 +133,22 @@ Use this template:
 {Any additional context, links, references}
 ```
 
-### 5. Report
+### 5. Update Epic File (if epic specified)
+
+If --epic=N was provided:
+1. Find the epic file: `docs/epics/epic-{NN}_*.md`
+2. Add a new row to the Sprints table:
+   ```
+   | {Sprint} | {Title} | planned |
+   ```
+3. If epic file not found, warn user but still create sprint
+
+### 6. Report
 
 Output:
 ```
 Created: docs/sprints/sprint-{NN}_{slug}.md
+Epic: {Epic number and title, or "None (standalone sprint)"}
 
 Next steps:
 1. Fill in the sprint details (Goal, Requirements, etc.)
