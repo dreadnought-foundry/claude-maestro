@@ -263,10 +263,11 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - Use `/epic-complete <N>` when all sprints in the epic are done.
 
    **If standalone** (IS_IN_EPIC=false):
-   - Move to `docs/sprints/3-done/_standalone/`
+   - Rename with `--done` suffix and move to `docs/sprints/3-done/_standalone/`
    ```bash
    mkdir -p docs/sprints/3-done/_standalone
-   mv "$SPRINT_FILE" docs/sprints/3-done/_standalone/
+   BASENAME=$(basename "$SPRINT_FILE" .md)
+   mv "$SPRINT_FILE" "docs/sprints/3-done/_standalone/${BASENAME}--done.md"
    ```
 
 6. **Update `docs/sprints/README.md`**:
@@ -310,7 +311,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - Hours: <calculated hours>
    - Steps completed: <count>
 
-   Sprint file moved to: docs/sprints/3-done/_standalone/<filename>
+   Sprint file moved to: docs/sprints/3-done/_standalone/<filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
    ```
 

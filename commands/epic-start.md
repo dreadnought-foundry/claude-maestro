@@ -59,6 +59,18 @@ EPIC_FOLDER=$(basename <found-path>)
 mv docs/sprints/{0-backlog,1-todo}/epic-{NN}_* docs/sprints/2-in-progress/
 ```
 
+### 4b. Verify All Sprints Moved Together
+
+List all sprint files to confirm they moved:
+```bash
+ls docs/sprints/2-in-progress/epic-{NN}_*/sprint-*.md
+```
+
+**Important**: All sprints in this epic are now in `2-in-progress/` together.
+- Individual sprints can be started with `/sprint-start <N>`
+- Completed sprints get `--done` suffix but **stay in this epic folder**
+- Epic folder moves to `3-done/` only when ALL sprints have `--done` suffix
+
 ### 5. Update Epic File Status
 
 Read `_epic.md` in the epic folder and update:

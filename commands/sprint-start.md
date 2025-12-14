@@ -43,16 +43,47 @@ Phase 4: Commit & Complete (sequential)
    - Tasks and acceptance criteria
    - Any open questions
 
-## Step 1.1a: Move Sprint File to In-Progress
+## Step 1.1a: Validate Sprint Location and Move If Needed
 
-**Use Bash to move the file:**
+**Determine where the sprint file currently lives:**
+
 ```bash
-mv docs/sprints/1-todo/<epic-folder>/sprint-$ARGUMENTS*.md docs/sprints/2-in-progress/<epic-folder>/
+# Find the sprint file
+SPRINT_FILE=$(find docs/sprints -name "sprint-$ARGUMENTS_*.md" -o -name "sprint-$ARGUMENTS*.md" | grep -v "\-\-" | head -1)
+echo "Found: $SPRINT_FILE"
 ```
 
-Validate move succeeded with Glob.
+**Handle based on location:**
 
-Update YAML frontmatter:
+### Case 1: Sprint is in an EPIC folder in `2-in-progress/`
+- Epic already started - sprint is where it should be
+- **No move needed** - continue to state file creation
+
+### Case 2: Sprint is in an EPIC folder in `1-todo/`
+- Epic not yet started - **BLOCK and inform user**
+```
+ERROR: Sprint $ARGUMENTS is part of Epic {E} which hasn't started yet.
+
+The epic workflow requires all sprints to move together.
+
+Start the epic first: /epic-start {E}
+
+This will move ALL sprints in the epic to in-progress together.
+Then you can start individual sprints with /sprint-start.
+```
+
+### Case 3: Sprint is STANDALONE in `1-todo/`
+- Move to `2-in-progress/` (standalone sprints move individually)
+```bash
+mv docs/sprints/1-todo/sprint-$ARGUMENTS*.md docs/sprints/2-in-progress/
+```
+
+### Case 4: Sprint is already in `2-in-progress/` (standalone)
+- Already started or resuming - **No move needed**
+
+**After determining location, validate with Glob.**
+
+**Update YAML frontmatter:**
 ```yaml
 ---
 sprint: $ARGUMENTS
