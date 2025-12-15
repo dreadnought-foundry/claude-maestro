@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""
+Sprint completion hook to validate pre-flight checklist.
+
+Exit codes:
+- 0: All checks pass, allow completion
+- 1: Error
+- 2: Block completion (checks failed)
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+STATE_FILE = Path(".claude/sprint-state.json")
+
+
+def run_tests() -> tuple[bool, str]:
+    """Run tests and return (passed, output)."""
+    result = subprocess.run(
+        ["pytest", "tests/", "-q", "--tb=no"],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0, result.stdout
+
+
+def check_git_clean() -> tuple[bool, str]:
+    """Check git working directory is clean."""
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True,
+        text=True
+    )
+    clean = len(result.stdout.strip()) == 0
+    return clean, result.stdout if not clean else "Clean"
+
+
+def check_no_secrets() -> tuple[bool, str]:
+    """Check for hardcoded secrets."""
+    result = subprocess.run(
+        ["grep", "-rn", "-E",
+         r"(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]",
+         "src/", "--include=*.py"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:  # grep found nothing
+        return True, "No secrets found"
+
+    # Filter out test files and comments
+    suspicious = []
+    for line in result.stdout.split("\n"):
+        if line and "test" not in line.lower() and "#" not in line:
+            suspicious.append(line)
+
+    if suspicious:
+        return False, "\n".join(suspicious)
+
+    return True, "No secrets found (filtered)"
+
+
+def main():
+    if not STATE_FILE.exists():
+        print("No active sprint")
+        return 1
+
+    with open(STATE_FILE) as f:
+        state = json.load(f)
+
+    sprint_num = state.get("sprint_number", "?")
+    print(f"Running pre-flight checklist for Sprint {sprint_num}...")
+    print()
+
+    failures = []
+
+    # 1. Tests passing
+    print("1. Checking tests...", end=" ")
+    tests_pass, test_output = run_tests()
+    if tests_pass:
+        print("PASS")
+    else:
+        print("FAIL")
+        failures.append(("Tests", test_output))
+
+    # 2. Git status clean
+    print("2. Checking git status...", end=" ")
+    git_clean, git_output = check_git_clean()
+    if git_clean:
+        print("PASS")
+    else:
+        print("FAIL")
+        failures.append(("Git status", f"Uncommitted changes:\n{git_output}"))
+
+    # 3. No hardcoded secrets
+    print("3. Checking for secrets...", end=" ")
+    no_secrets, secrets_output = check_no_secrets()
+    if no_secrets:
+        print("PASS")
+    else:
+        print("FAIL")
+        failures.append(("Secrets", f"Potential secrets found:\n{secrets_output}"))
+
+    # 4-9 are checked from state file (set by earlier steps)
+    checklist = state.get("pre_flight_checklist", {})
+
+    optional_checks = [
+        ("migrations_verified", "4. Database migrations"),
+        ("sample_data_generated", "5. Sample data"),
+        ("mcp_tools_tested", "6. MCP tools"),
+        ("dialog_example_created", "7. Dialog example"),
+        ("sprint_file_updated", "8. Sprint file updated"),
+        ("code_has_docstrings", "9. Code docstrings"),
+    ]
+
+    for key, name in optional_checks:
+        value = checklist.get(key)
+        print(f"{name}...", end=" ")
+        if value is True:
+            print("PASS")
+        elif value is False:
+            print("FAIL")
+            failures.append((name, "Explicitly marked as failed"))
+        else:
+            print("SKIP (not applicable)")
+
+    print()
+
+    if failures:
+        print("=" * 60)
+        print("PRE-FLIGHT CHECKLIST FAILED")
+        print("=" * 60)
+        print()
+        for name, detail in failures:
+            print(f"FAILED: {name}")
+            if detail:
+                for line in detail.split("\n")[:5]:  # Limit output
+                    print(f"  {line}")
+            print()
+        print("Sprint cannot be marked complete until all checks pass.")
+        print()
+        return 2  # Block completion
+
+    print("=" * 60)
+    print("PRE-FLIGHT CHECKLIST PASSED")
+    print("=" * 60)
+    print()
+    print(f"Sprint {sprint_num} is ready to be marked complete.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
