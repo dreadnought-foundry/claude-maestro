@@ -270,6 +270,54 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    mv "$SPRINT_FILE" "docs/sprints/3-done/_standalone/${BASENAME}--done.md"
    ```
 
+5b. **VALIDATE Sprint File Location** (CRITICAL):
+
+   After moving/renaming, verify the file is in the correct location:
+
+   ```bash
+   # Define expected location
+   if [ "$IS_IN_EPIC" = true ]; then
+     EXPECTED_PATH=$(echo "$SPRINT_FILE" | sed 's/\.md$/--done.md/')
+   else
+     EXPECTED_PATH="docs/sprints/3-done/_standalone/${BASENAME}--done.md"
+   fi
+
+   # Verify file exists at expected location
+   if [ ! -f "$EXPECTED_PATH" ]; then
+     echo "ERROR: Sprint file not found at expected location: $EXPECTED_PATH"
+     exit 1
+   fi
+
+   # Verify filename has --done suffix
+   if ! echo "$EXPECTED_PATH" | grep -q '\-\-done\.md$'; then
+     echo "ERROR: Sprint file missing --done suffix"
+     exit 1
+   fi
+
+   # Verify NOT in invalid folders (4-done, 5-done, etc.)
+   if echo "$EXPECTED_PATH" | grep -qE 'docs/sprints/[0-24-9]-done'; then
+     echo "ERROR: Sprint file in invalid folder. Must be in 3-done/"
+     exit 1
+   fi
+
+   # Verify standalone files are in _standalone subfolder
+   if [ "$IS_IN_EPIC" = false ]; then
+     if ! echo "$EXPECTED_PATH" | grep -q '3-done/_standalone/'; then
+       echo "ERROR: Standalone sprint must be in 3-done/_standalone/"
+       exit 1
+     fi
+   fi
+
+   echo "VALIDATED: Sprint file correctly located at $EXPECTED_PATH"
+   ```
+
+   **If validation fails**, report the error and:
+   - Check where the file actually ended up: `find docs/sprints -name "*sprint-$ARGUMENTS*"`
+   - Use `/sprint-recover $ARGUMENTS` to fix the location
+   - DO NOT mark sprint as complete until file is in correct location
+
+   Update state: `pre_flight_checklist.file_location_validated = true/false`
+
 6. **Update `docs/sprints/README.md`**:
    - Add sprint to completed list with hours tracked
    - Update statistics if present
@@ -278,13 +326,31 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - `status` = "complete"
    - `completed_at` = current ISO timestamp
 
-8. **Report success**:
+8. **Create Git Tag**:
+
+   Create an annotated git tag for the completed sprint:
+   ```bash
+   # Get sprint title from file
+   SPRINT_TITLE=$(grep -m1 "^title:" "$SPRINT_FILE" | sed 's/title: *//' | tr -d '"')
+
+   # Create annotated tag
+   git tag -a "sprint-$ARGUMENTS" -m "Sprint $ARGUMENTS: $SPRINT_TITLE"
+   ```
+
+   Tag format: `sprint-N` (e.g., `sprint-42`, `sprint-123`)
+
+   **Note**: Tags are local by default. To share with team:
+   ```bash
+   git push origin sprint-$ARGUMENTS
+   ```
+
+9. **Report success**:
 
    **For epic sprints**:
    ```
    Sprint $ARGUMENTS: <title> - COMPLETE ✓
 
-   Pre-Flight Checklist: 8/8 passed
+   Pre-Flight Checklist: 9/9 passed
 
    Summary:
    - Started: <timestamp>
@@ -294,6 +360,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
 
    Sprint file renamed to: <filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
+   Git tag created: sprint-$ARGUMENTS
 
    Epic status: <X of Y sprints complete>
    When all sprints done: /epic-complete <epic-number>
@@ -303,7 +370,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    ```
    Sprint $ARGUMENTS: <title> - COMPLETE ✓
 
-   Pre-Flight Checklist: 8/8 passed
+   Pre-Flight Checklist: 9/9 passed
 
    Summary:
    - Started: <timestamp>
@@ -313,6 +380,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
 
    Sprint file moved to: docs/sprints/3-done/_standalone/<filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
+   Git tag created: sprint-$ARGUMENTS
    ```
 
 ---
