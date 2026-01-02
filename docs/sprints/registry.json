@@ -18,12 +18,12 @@
     },
     "2": {
       "title": "Automated Lifecycle Management",
-      "status": "todo",
+      "status": "done",
       "epic": 1,
       "created": "2025-12-30",
       "started": null,
-      "completed": null,
-      "hours": null,
+      "completed": "2026-01-01",
+      "hours": 56.1,
       "estimatedHours": 5,
       "workflowVersion": "3.0",
       "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-02_automated-lifecycle-management/sprint-02_automated-lifecycle-management.md"
@@ -83,7 +83,7 @@
       "started": null,
       "completed": null,
       "totalSprints": 5,
-      "completedSprints": 0,
+      "completedSprints": 1,
       "estimatedHours": 24,
       "sprintBreakdown": {
         "sprint_1": 2.5,
