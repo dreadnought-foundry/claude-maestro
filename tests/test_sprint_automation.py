@@ -718,11 +718,85 @@ class TestListEpics:
 class TestRecoverSprint:
     """Test recover_sprint() function."""
 
-    @pytest.mark.skip(reason="recover_sprint implementation may differ from expectations")
-    def test_recover_sprint_moves_to_correct_location(self, temp_project):
-        """Should move sprint to correct location based on status."""
-        # TODO: Verify actual recover_sprint behavior and update test
-        pass
+    def test_recover_sprint_standalone_in_wrong_location(self, temp_project):
+        """Should move standalone sprint from wrong location to 3-done."""
+        # Create a standalone sprint in wrong location (2-in-progress)
+        wrong_dir = temp_project / "docs" / "sprints" / "2-in-progress"
+        sprint_file = wrong_dir / "sprint-15_test-sprint--done.md"
+        sprint_content = """---
+sprint: 15
+title: Test Sprint
+status: done
+---
+
+# Sprint 15
+"""
+        sprint_file.write_text(sprint_content)
+
+        # Create state file
+        state_file = temp_project / ".claude" / "sprint-15-state.json"
+        state = {
+            "sprint_number": 15,
+            "sprint_file": str(sprint_file),
+            "status": "done"
+        }
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+
+        # Recover sprint
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            result = recover_sprint(15, dry_run=False)
+
+        # Verify moved to correct location
+        correct_path = temp_project / "docs" / "sprints" / "3-done" / "sprint-15_test-sprint--done.md"
+        assert correct_path.exists()
+        assert not sprint_file.exists()
+
+        # Verify state file updated
+        with open(state_file) as f:
+            updated_state = json.load(f)
+        assert updated_state["sprint_file"] == str(correct_path)
+
+        # Verify result
+        assert result["sprint_num"] == 15
+        assert result["new_path"] == str(correct_path)
+
+    def test_recover_sprint_dry_run(self, temp_project):
+        """Should preview recovery without moving files."""
+        # Create sprint in wrong location
+        wrong_dir = temp_project / "docs" / "sprints" / "2-in-progress"
+        sprint_file = wrong_dir / "sprint-20_another--done.md"
+        sprint_file.write_text("---\nsprint: 20\ntitle: Another\nstatus: done\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            result = recover_sprint(20, dry_run=True)
+
+        # Verify no move happened
+        assert sprint_file.exists()
+        assert result["status"] == "dry-run"
+        assert result["sprint_num"] == 20
+
+    def test_recover_sprint_already_correct_location(self, temp_project):
+        """Should raise error if sprint is already in correct location."""
+        # Create sprint in correct location
+        correct_dir = temp_project / "docs" / "sprints" / "3-done"
+        sprint_file = correct_dir / "sprint-25_correct--done.md"
+        sprint_file.write_text("---\nsprint: 25\ntitle: Correct\nstatus: done\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(ValidationError, match="already in correct location"):
+                recover_sprint(25, dry_run=False)
+
+    def test_recover_sprint_not_done(self, temp_project):
+        """Should raise error if sprint doesn't have --done suffix."""
+        # Create sprint without --done suffix
+        sprint_dir = temp_project / "docs" / "sprints" / "2-in-progress"
+        sprint_file = sprint_dir / "sprint-30_not-done.md"
+        sprint_file.write_text("---\nsprint: 30\ntitle: Not Done\nstatus: in-progress\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(ValidationError, match="no --done suffix"):
+                recover_sprint(30, dry_run=False)
 
 
 class TestAddToEpic:
@@ -834,6 +908,359 @@ class TestCreateProject:
         """Should raise error when target directory doesn't exist."""
         with pytest.raises(FileOperationError, match="not found"):
             create_project("/nonexistent/path")
+
+
+# ============================================================================
+# CLI INTEGRATION TESTS
+# ============================================================================
+
+class TestCLICommands:
+    """Test CLI command parsing and execution."""
+
+    def test_cli_advance_step(self, temp_project, sprint_in_progress, capsys):
+        """Test advance-step CLI command."""
+        # Create sprint-steps.json
+        steps_data = {
+            "version": "3.1.0",
+            "step_order": ["1.1", "2.1", "2.2", "3.1"],
+            "phases": [
+                {"phase": 2, "name": "Implementation", "steps": [
+                    {"step": "2.1", "name": "Write Tests"},
+                    {"step": "2.2", "name": "Implement"}
+                ]}
+            ]
+        }
+
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+            (temp_project / ".claude" / "sprint-steps.json").write_text(json.dumps(steps_data))
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                with patch('sys.argv', ['sprint_lifecycle.py', 'advance-step', '10']):
+                    from scripts.sprint_lifecycle import main
+                    main()
+
+        captured = capsys.readouterr()
+        assert "advanced to step" in captured.out.lower() or "2.2" in captured.out
+
+    def test_cli_generate_postmortem(self, temp_project, sprint_in_progress, capsys):
+        """Test generate-postmortem CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'generate-postmortem', '10']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "postmortem" in captured.out.lower()
+
+    def test_cli_sprint_status(self, temp_project, sprint_in_progress, capsys):
+        """Test sprint-status CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'sprint-status', '10']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Sprint 10" in captured.out or "Active Sprint" in captured.out
+
+    def test_cli_list_epics(self, temp_project, epic_in_progress, capsys):
+        """Test list-epics CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'list-epics']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Epic" in captured.out
+
+    def test_cli_recover_sprint_error(self, temp_project, sprint_in_progress):
+        """Test recover-sprint CLI with error handling."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'recover-sprint', '10']):
+                from scripts.sprint_lifecycle import main
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 1
+
+    def test_cli_no_command(self, capsys):
+        """Test CLI with no command shows help."""
+        with patch('sys.argv', ['sprint_lifecycle.py']):
+            from scripts.sprint_lifecycle import main
+            with pytest.raises(SystemExit):
+                main()
+
+        captured = capsys.readouterr()
+        # Help output expected
+
+    def test_cli_start_sprint(self, temp_project, sprint_in_todo, capsys):
+        """Test start-sprint CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'start-sprint', '5']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "5" in captured.out or "started" in captured.out.lower()
+
+    def test_cli_abort_sprint(self, temp_project, sprint_in_progress, capsys):
+        """Test abort-sprint CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'abort-sprint', '10', 'test reason']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "abort" in captured.out.lower() or "10" in captured.out
+
+    def test_cli_block_sprint(self, temp_project, sprint_in_progress, capsys):
+        """Test block-sprint CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'block-sprint', '10', 'waiting for API']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "block" in captured.out.lower() or "10" in captured.out
+
+    def test_cli_resume_sprint(self, temp_project):
+        """Test resume-sprint CLI command."""
+        # Create blocked sprint
+        sprint_dir = temp_project / "docs" / "sprints" / "2-in-progress"
+        sprint_file = sprint_dir / "sprint-15_blocked-sprint--blocked.md"
+        sprint_file.write_text("---\nsprint: 15\ntitle: Blocked\nstatus: in-progress\nblocker: test\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'resume-sprint', '15']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+    def test_cli_start_epic(self, temp_project, capsys):
+        """Test start-epic CLI command."""
+        # Create epic in todo
+        epic_dir = temp_project / "docs" / "sprints" / "1-todo" / "epic-05_test-epic"
+        epic_dir.mkdir(parents=True)
+        (epic_dir / "_epic.md").write_text("---\nepic: 5\ntitle: Test\nstatus: todo\n---\n# Epic")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'start-epic', '5']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "5" in captured.out or "epic" in captured.out.lower()
+
+    def test_cli_complete_epic(self, temp_project, capsys):
+        """Test complete-epic CLI command."""
+        # Create epic with all sprints done
+        epic_dir = temp_project / "docs" / "sprints" / "2-in-progress" / "epic-06_complete-epic"
+        epic_dir.mkdir(parents=True)
+        (epic_dir / "_epic.md").write_text("---\nepic: 6\ntitle: Complete\nstatus: in-progress\n---\n# Epic")
+        (epic_dir / "sprint-100_done--done.md").write_text("---\nsprint: 100\ntitle: Done\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'complete-epic', '6']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "6" in captured.out or "complete" in captured.out.lower()
+
+    def test_cli_archive_epic(self, temp_project, capsys):
+        """Test archive-epic CLI command."""
+        # Create epic in done
+        epic_dir = temp_project / "docs" / "sprints" / "3-done" / "epic-07_archive-epic"
+        epic_dir.mkdir(parents=True)
+        (epic_dir / "_epic.md").write_text("---\nepic: 7\ntitle: Archive\nstatus: done\n---\n# Epic")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'archive-epic', '7']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "7" in captured.out or "archive" in captured.out.lower()
+
+    def test_cli_epic_status(self, temp_project, epic_in_progress, capsys):
+        """Test epic-status CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'epic-status', '3']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Epic" in captured.out or "3" in captured.out
+
+    def test_cli_add_to_epic(self, temp_project, epic_in_progress, capsys):
+        """Test add-to-epic CLI command."""
+        # Create standalone sprint
+        sprint_file = temp_project / "docs" / "sprints" / "1-todo" / "sprint-50_standalone.md"
+        sprint_file.write_text("---\nsprint: 50\ntitle: Standalone\nepic: null\n---\n# Sprint")
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'add-to-epic', '50', '3']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "50" in captured.out or "3" in captured.out
+
+    def test_cli_register_sprint(self, temp_project, capsys):
+        """Test register-sprint CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'register-sprint', 'New Sprint', '--estimated-hours', '5']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Registered" in captured.out or "sprint" in captured.out.lower()
+
+    def test_cli_register_epic(self, temp_project, capsys):
+        """Test register-epic CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'register-epic', 'New Epic', '--sprint-count', '3']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Registered" in captured.out or "epic" in captured.out.lower()
+
+    def test_cli_next_sprint_number(self, temp_project, capsys):
+        """Test next-sprint-number CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'next-sprint-number']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Next sprint number" in captured.out or "7" in captured.out
+
+    def test_cli_next_epic_number(self, temp_project, capsys):
+        """Test next-epic-number CLI command."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with patch('sys.argv', ['sprint_lifecycle.py', 'next-epic-number']):
+                from scripts.sprint_lifecycle import main
+                main()
+
+        captured = capsys.readouterr()
+        assert "Next epic number" in captured.out or "2" in captured.out
+
+    def test_cli_create_project(self, temp_project, capsys):
+        """Test create-project CLI command with dry-run."""
+        with patch('sys.argv', ['sprint_lifecycle.py', 'create-project', '--dry-run']):
+            from scripts.sprint_lifecycle import main
+            main()
+
+        captured = capsys.readouterr()
+        assert "DRY RUN" in captured.out or "project" in captured.out.lower()
+
+
+# ============================================================================
+# ERROR HANDLING TESTS
+# ============================================================================
+
+class TestErrorHandling:
+    """Test error handling across functions."""
+
+    def test_start_sprint_not_found(self, temp_project):
+        """Test start_sprint with non-existent sprint."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                start_sprint(999, dry_run=False)
+
+    def test_abort_sprint_not_found(self, temp_project):
+        """Test abort_sprint with non-existent sprint."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                abort_sprint(999, "test reason", dry_run=False)
+
+    def test_block_sprint_not_found(self, temp_project):
+        """Test block_sprint with non-existent sprint."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                block_sprint(999, "test blocker", dry_run=False)
+
+    def test_get_sprint_status_no_state(self, temp_project):
+        """Test get_sprint_status when state file doesn't exist."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="No state file"):
+                get_sprint_status(999)
+
+    def test_advance_step_missing_current_step(self, temp_project, sprint_in_progress):
+        """Test advance_step when state is missing current_step."""
+        # Corrupt state file
+        state_file = temp_project / ".claude" / "sprint-10-state.json"
+        with open(state_file) as f:
+            state = json.load(f)
+        del state["current_step"]
+        with open(state_file, 'w') as f:
+            json.dump(state, f)
+
+        steps_data = {"version": "3.1.0", "step_order": ["1.1"], "phases": []}
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+            (temp_project / ".claude" / "sprint-steps.json").write_text(json.dumps(steps_data))
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                with pytest.raises(ValidationError, match="missing current_step"):
+                    advance_step(10, dry_run=False)
+
+    def test_advance_step_at_final_step(self, temp_project, sprint_in_progress):
+        """Test advance_step when already at final step."""
+        # Set sprint to final step
+        state_file = temp_project / ".claude" / "sprint-10-state.json"
+        with open(state_file) as f:
+            state = json.load(f)
+        state["current_step"] = "4.1"  # Final step
+        with open(state_file, 'w') as f:
+            json.dump(state, f)
+
+        steps_data = {"version": "3.1.0", "step_order": ["1.1", "2.1", "3.1", "4.1"], "phases": []}
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+            (temp_project / ".claude" / "sprint-steps.json").write_text(json.dumps(steps_data))
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                with pytest.raises(ValidationError, match="final step|sprint-complete"):
+                    advance_step(10, dry_run=False)
+
+    def test_advance_step_no_steps_file(self, temp_project, sprint_in_progress):
+        """Test advance_step when sprint-steps.json doesn't exist."""
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                with pytest.raises(FileOperationError, match="Sprint steps definition not found"):
+                    advance_step(10, dry_run=False)
+
+    def test_generate_postmortem_without_state(self, temp_project, sprint_in_progress):
+        """Test generate_postmortem when state file doesn't exist."""
+        # Remove state file
+        state_file = temp_project / ".claude" / "sprint-10-state.json"
+        state_file.unlink()
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            # Should still work, just without metrics
+            result = generate_postmortem(10, dry_run=False)
+            assert result["sprint_num"] == 10
+            assert result["metrics"] == {}
+
+    def test_start_epic_not_found(self, temp_project):
+        """Test start_epic with non-existent epic."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                start_epic(999, dry_run=False)
+
+    def test_complete_epic_not_found(self, temp_project):
+        """Test complete_epic with non-existent epic."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                complete_epic(999, dry_run=False)
+
+    def test_archive_epic_not_found(self, temp_project):
+        """Test archive_epic with non-existent epic."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            with pytest.raises(FileOperationError, match="not found"):
+                archive_epic(999, dry_run=False)
 
 
 # ============================================================================

@@ -3154,20 +3154,12 @@ def main():
         # === LIFECYCLE COMMAND HANDLERS ===
 
         elif args.command == "start-sprint":
-            result = start_sprint(args.sprint_num, dry_run=args.dry_run)
-            if not args.dry_run:
-                print(f"✓ Started sprint {result['sprint_num']}: {result['title']}")
-                print(f"  Moved to: {result['new_path']}")
-                print(f"  State file: {result['state_file']}")
+            start_sprint(args.sprint_num, dry_run=args.dry_run)
+            # Output handled by function
 
         elif args.command == "abort-sprint":
-            result = abort_sprint(args.sprint_num, args.reason, dry_run=args.dry_run)
-            if not args.dry_run:
-                print(f"✓ Aborted sprint {result['sprint_num']}: {result['title']}")
-                print(f"  Reason: {args.reason}")
-                print(f"  New path: {result['new_path']}")
-                if result.get('hours'):
-                    print(f"  Hours worked: {result['hours']:.1f}")
+            abort_sprint(args.sprint_num, args.reason, dry_run=args.dry_run)
+            # Output handled by function
 
         elif args.command == "block-sprint":
             result = block_sprint(args.sprint_num, args.reason, dry_run=args.dry_run)
