@@ -109,6 +109,19 @@ Test epic sprint.
 """
     sprint_path.write_text(content)
 
+    # Create sprint-11 (not done yet)
+    sprint_11_path = epic_dir / "sprint-11_another-sprint.md"
+    sprint_11_content = """---
+sprint: 11
+title: Another Sprint
+status: in-progress
+epic: 2
+---
+
+# Sprint 11
+"""
+    sprint_11_path.write_text(sprint_11_content)
+
     # Create epic metadata file
     epic_file = epic_dir / "_epic.md"
     epic_file.write_text("# Epic 02: Test Epic\n\n## Sprints\n- Sprint 10\n- Sprint 11\n")
@@ -123,14 +136,16 @@ class TestFindProjectRoot:
         """Should find project root when already at root."""
         with patch('pathlib.Path.cwd', return_value=temp_project):
             root = find_project_root()
-            assert root == temp_project
+            # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
+            assert root.resolve() == temp_project.resolve()
 
     def test_find_from_subdirectory(self, temp_project):
         """Should find project root when in subdirectory."""
         subdir = temp_project / "docs" / "sprints"
         with patch('pathlib.Path.cwd', return_value=subdir):
             root = find_project_root()
-            assert root == temp_project
+            # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
+            assert root.resolve() == temp_project.resolve()
 
     def test_find_from_deep_subdirectory(self, temp_project):
         """Should find project root when in deep subdirectory."""
@@ -138,7 +153,8 @@ class TestFindProjectRoot:
         deep_dir.mkdir(parents=True)
         with patch('pathlib.Path.cwd', return_value=deep_dir):
             root = find_project_root()
-            assert root == temp_project
+            # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
+            assert root.resolve() == temp_project.resolve()
 
     def test_error_when_no_claude_dir(self):
         """Should raise error when no .claude/ directory found."""
@@ -263,7 +279,9 @@ class TestMoveToDone:
         # Verify YAML frontmatter updated
         content = expected_path.read_text()
         assert "status: done" in content
-        assert "completed: 2025-12-30" in content
+        # Check that completed field exists (date will be current date)
+        assert "completed:" in content
+        assert "completed: null" not in content
 
     def test_rename_epic_sprint_in_place(self, temp_project, sprint_file_epic):
         """Should rename epic sprint with --done suffix in epic folder."""
