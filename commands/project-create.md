@@ -11,7 +11,8 @@ Initialize a new project with the complete sprint workflow system from the maste
 
 | Component | Source | Destination |
 |-----------|--------|-------------|
-| Slash Commands | `~/.claude/commands/` | (uses global) |
+| Commands | `~/Development/Dreadnought/claude-maestro/commands/` | `./commands/` |
+| Scripts | `~/Development/Dreadnought/claude-maestro/scripts/` | `./scripts/` |
 | Global Agents | `~/.claude/agents/` | `.claude/agents/` |
 | Project Agents | `~/.claude/templates/project/.claude/agents/` | `.claude/agents/` |
 | Global Hooks | `~/.claude/hooks/` | `.claude/hooks/` |
@@ -19,6 +20,8 @@ Initialize a new project with the complete sprint workflow system from the maste
 | Workflow Config | `~/.claude/templates/project/.claude/` | `.claude/` |
 | CLAUDE.md | `~/.claude/templates/project/CLAUDE.md` | `./CLAUDE.md` |
 | Sprint Dirs | `~/.claude/templates/project/docs/sprints/` | `./docs/sprints/` |
+
+**Note:** Commands and scripts are copied from the master project (claude-maestro).
 
 ## Instructions
 
@@ -54,13 +57,42 @@ fi
 ```bash
 mkdir -p "$TARGET_PATH/.claude/agents"
 mkdir -p "$TARGET_PATH/.claude/hooks"
+mkdir -p "$TARGET_PATH/commands"
+mkdir -p "$TARGET_PATH/scripts"
+mkdir -p "$TARGET_PATH/docs/sprints/0-backlog"
 mkdir -p "$TARGET_PATH/docs/sprints/1-todo"
 mkdir -p "$TARGET_PATH/docs/sprints/2-in-progress"
-mkdir -p "$TARGET_PATH/docs/sprints/3-done/_standalone"
+mkdir -p "$TARGET_PATH/docs/sprints/3-done"
+mkdir -p "$TARGET_PATH/docs/sprints/4-blocked"
 mkdir -p "$TARGET_PATH/docs/sprints/5-aborted"
+mkdir -p "$TARGET_PATH/docs/sprints/6-archived"
 ```
 
-### 4. Copy Agents
+### 4. Copy Commands and Scripts
+
+```bash
+# Define master project path
+MASTER_PROJECT="$HOME/Development/Dreadnought/claude-maestro"
+
+# Copy commands
+if [ -d "$MASTER_PROJECT/commands" ]; then
+  cp -r "$MASTER_PROJECT/commands"/*.md "$TARGET_PATH/commands/" 2>/dev/null || true
+  echo "Copied $(ls -1 "$TARGET_PATH/commands"/*.md 2>/dev/null | wc -l) command files"
+else
+  echo "WARNING: Master project not found at $MASTER_PROJECT"
+fi
+
+# Copy scripts
+if [ -d "$MASTER_PROJECT/scripts" ]; then
+  cp -r "$MASTER_PROJECT/scripts"/* "$TARGET_PATH/scripts/" 2>/dev/null || true
+  echo "Copied automation scripts"
+  chmod +x "$TARGET_PATH/scripts"/*.py 2>/dev/null || true
+else
+  echo "WARNING: Master project scripts not found"
+fi
+```
+
+### 5. Copy Agents
 
 ```bash
 # Copy global agents
@@ -73,7 +105,7 @@ echo "Copied agents:"
 ls "$TARGET_PATH/.claude/agents/"
 ```
 
-### 5. Copy Hooks
+### 6. Copy Hooks
 
 ```bash
 # Copy global hooks
@@ -86,7 +118,7 @@ echo "Copied hooks:"
 ls "$TARGET_PATH/.claude/hooks/"
 ```
 
-### 6. Copy Configuration
+### 7. Copy Configuration
 
 ```bash
 # Copy sprint-steps.json
@@ -99,7 +131,7 @@ cp ~/.claude/templates/project/.claude/settings.json "$TARGET_PATH/.claude/"
 cp ~/.claude/WORKFLOW_VERSION "$TARGET_PATH/.claude/" 2>/dev/null || true
 ```
 
-### 7. Copy CLAUDE.md
+### 8. Copy CLAUDE.md
 
 ```bash
 # Copy CLAUDE.md template (don't overwrite if exists)
@@ -111,17 +143,24 @@ else
 fi
 ```
 
-### 8. Initialize Sprint Counter
+### 9. Create Sprint Registry
 
 ```bash
-# Create sprint counter if it doesn't exist
-if [ ! -f "$TARGET_PATH/docs/sprints/next-sprint.txt" ]; then
-  echo "1" > "$TARGET_PATH/docs/sprints/next-sprint.txt"
-  echo "Created sprint counter (starting at 1)"
-fi
+# Create registry file
+cat > "$TARGET_PATH/docs/sprints/registry.json" << 'REGISTRY'
+{
+  "counters": {
+    "next_sprint": 1,
+    "next_epic": 1
+  },
+  "sprints": {},
+  "epics": {}
+}
+REGISTRY
+echo "Created sprint registry"
 ```
 
-### 9. Update .gitignore
+### 10. Update .gitignore
 
 ```bash
 # Add workflow state files to .gitignore
@@ -141,12 +180,14 @@ GITIGNORE
 fi
 ```
 
-### 10. Report Success
+### 11. Report Success
 
 ```
 ✅ Project workflow initialized at: $TARGET_PATH
 
 Created structure:
+├── commands/             (X command files)
+├── scripts/              (automation)
 ├── .claude/
 │   ├── agents/           (X agents)
 │   ├── hooks/            (X hooks)
@@ -154,11 +195,14 @@ Created structure:
 │   ├── sprint-steps.json
 │   └── WORKFLOW_VERSION
 ├── docs/sprints/
+│   ├── 0-backlog/
 │   ├── 1-todo/
 │   ├── 2-in-progress/
-│   ├── 3-done/_standalone/
+│   ├── 3-done/
+│   ├── 4-blocked/
 │   ├── 5-aborted/
-│   └── next-sprint.txt   (counter: 1)
+│   ├── 6-archived/
+│   └── registry.json
 └── CLAUDE.md
 
 Next steps:
