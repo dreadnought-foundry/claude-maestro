@@ -909,6 +909,133 @@ class TestCreateProject:
         with pytest.raises(FileOperationError, match="not found"):
             create_project("/nonexistent/path")
 
+    def test_create_project_maestro_mode_detection(self):
+        """Should detect maestro mode when templates/project/ exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "maestro-project"
+            target.mkdir()
+
+            # Create templates/project/ to trigger maestro mode
+            (target / "templates" / "project" / ".claude" / "agents").mkdir(parents=True)
+            (target / "templates" / "project" / ".claude" / "hooks").mkdir(parents=True)
+            (target / "templates" / "project" / ".claude" / "sprint-steps.json").write_text("{}")
+            (target / "templates" / "project" / ".claude" / "settings.json").write_text("{}")
+            (target / "templates" / "project" / "CLAUDE.md").write_text("# Template")
+            (target / "WORKFLOW_VERSION").write_text("3.1.0")
+
+            # Create existing commands/ and scripts/ (maestro already has these)
+            (target / "commands").mkdir()
+            (target / "scripts").mkdir()
+
+            result = create_project(str(target))
+
+            # Verify maestro mode was detected
+            assert result["maestro_mode"] is True
+            assert result["status"] == "initialized"
+
+            # Verify structure created
+            assert (target / ".claude" / "agents").exists()
+            assert (target / ".claude" / "sprint-steps.json").exists()
+
+            # Verify commands/ and scripts/ were NOT copied (skipped in maestro mode)
+            # They already exist from before, but no files should be copied into them
+            assert len(list((target / "commands").iterdir())) == 0
+            assert len(list((target / "scripts").iterdir())) == 0
+
+    def test_create_project_maestro_mode_copies_from_local_templates(self):
+        """Should copy from ./templates/project/ in maestro mode."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "maestro-project"
+            target.mkdir()
+
+            # Create templates/project/ with test content
+            template_path = target / "templates" / "project"
+            (template_path / ".claude" / "agents").mkdir(parents=True)
+            (template_path / ".claude" / "hooks").mkdir(parents=True)
+            (template_path / ".claude" / "sprint-steps.json").write_text('{"test": "data"}')
+            (template_path / ".claude" / "settings.json").write_text('{"setting": "value"}')
+
+            # Create a test agent file
+            (template_path / ".claude" / "agents" / "test-agent.md").write_text("# Test Agent")
+
+            # Create a test hook file
+            (template_path / ".claude" / "hooks" / "test_hook.py").write_text("# Test Hook")
+
+            (target / "WORKFLOW_VERSION").write_text("3.1.0")
+
+            result = create_project(str(target))
+
+            # Verify files were copied from local templates
+            assert (target / ".claude" / "agents" / "test-agent.md").exists()
+            assert (target / ".claude" / "hooks" / "test_hook.py").exists()
+            assert (target / ".claude" / "sprint-steps.json").read_text() == '{"test": "data"}'
+
+            # Verify maestro mode flag
+            assert result["maestro_mode"] is True
+
+    def test_create_project_normal_mode_uses_global_templates(self):
+        """Should copy from ~/.claude/templates/project/ in normal mode."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "normal-project"
+            target.mkdir()
+
+            # Do NOT create templates/project/ - this is normal mode
+
+            with patch('scripts.sprint_lifecycle.Path.home') as mock_home:
+                fake_home = Path(tmpdir) / "home"
+                fake_home.mkdir()
+                mock_home.return_value = fake_home
+
+                # Create master project
+                master = fake_home / "Development" / "Dreadnought" / "claude-maestro"
+                master.mkdir(parents=True)
+                (master / "commands").mkdir()
+                (master / "commands" / "test-cmd.md").write_text("# Test")
+                (master / "scripts").mkdir()
+                (master / "WORKFLOW_VERSION").write_text("3.1.0")
+
+                # Create global templates
+                template = fake_home / ".claude" / "templates" / "project"
+                (template / ".claude" / "agents").mkdir(parents=True)
+                (template / ".claude" / "hooks").mkdir(parents=True)
+                (template / ".claude" / "sprint-steps.json").write_text('{"global": "template"}')
+                (template / ".claude" / "settings.json").write_text("{}")
+                (template / "CLAUDE.md").write_text("# Global")
+
+                # Create global .claude
+                (fake_home / ".claude" / "agents").mkdir(parents=True)
+                (fake_home / ".claude" / "hooks").mkdir(parents=True)
+
+                result = create_project(str(target))
+
+                # Verify normal mode (not maestro)
+                assert result["maestro_mode"] is False
+
+                # Verify commands/ was copied
+                assert (target / "commands" / "test-cmd.md").exists()
+
+                # Verify config came from global templates
+                assert (target / ".claude" / "sprint-steps.json").read_text() == '{"global": "template"}'
+
+    def test_create_project_maestro_mode_command_count_zero(self):
+        """Should report 0 commands copied in maestro mode."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "maestro-project"
+            target.mkdir()
+
+            # Create minimal maestro structure
+            (target / "templates" / "project" / ".claude" / "agents").mkdir(parents=True)
+            (target / "templates" / "project" / ".claude" / "hooks").mkdir(parents=True)
+            (target / "templates" / "project" / ".claude" / "sprint-steps.json").write_text("{}")
+            (target / "templates" / "project" / ".claude" / "settings.json").write_text("{}")
+            (target / "WORKFLOW_VERSION").write_text("3.1.0")
+
+            result = create_project(str(target))
+
+            # In maestro mode, commands should not be copied
+            assert result["command_count"] == 0
+            assert result["maestro_mode"] is True
+
 
 # ============================================================================
 # CLI INTEGRATION TESTS

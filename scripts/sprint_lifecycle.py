@@ -2508,15 +2508,16 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     """
     Initialize a new project with the complete sprint workflow system.
 
-    Copies commands, scripts, agents, hooks, and configuration from the master
-    template to set up a new project.
+    Supports dual-mode operation:
+    - Maestro mode: If templates/project/ exists in target, copy FROM local templates
+    - Normal mode: Copy FROM ~/.claude/templates/project/ (standard projects)
 
     Args:
         target_path: Target directory path (defaults to current directory)
         dry_run: If True, preview changes without executing
 
     Returns:
-        Dict with initialization summary
+        Dict with initialization summary including 'maestro_mode' flag
 
     Raises:
         FileOperationError: If target doesn't exist or master template not found
@@ -2545,17 +2546,27 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
             f"Use /project-update to sync changes instead."
         )
 
-    # 3. Define source paths
+    # 3. Detect maestro mode
+    maestro_mode = (target / "templates" / "project").exists()
+
+    # 4. Define source paths based on mode
     master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
     global_claude = Path.home() / ".claude"
-    template_path = global_claude / "templates" / "project"
 
-    # Validate master project exists
-    if not master_project.exists():
-        raise FileOperationError(
-            f"Master project not found at {master_project}\n"
-            f"Cannot initialize without template source."
-        )
+    if maestro_mode:
+        # Maestro mode: Use local templates
+        template_path = target / "templates" / "project"
+        print(f"🔧 MAESTRO MODE: Initializing from local templates")
+        print(f"   Source: {template_path}")
+    else:
+        # Normal mode: Use global templates
+        template_path = global_claude / "templates" / "project"
+        # Validate master project exists for normal mode
+        if not master_project.exists():
+            raise FileOperationError(
+                f"Master project not found at {master_project}\n"
+                f"Cannot initialize without template source."
+            )
 
     if dry_run:
         print(f"[DRY RUN] Would initialize project at: {target}")
@@ -2581,13 +2592,11 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
         print(f"  └── .gitignore (updated)")
         return {"status": "dry-run", "target": str(target)}
 
-    # 4. Create directory structure
+    # 5. Create directory structure
     print(f"→ Creating directory structure...")
     dirs_to_create = [
         target / ".claude" / "agents",
         target / ".claude" / "hooks",
-        target / "commands",
-        target / "scripts",
         target / "docs" / "sprints" / "0-backlog",
         target / "docs" / "sprints" / "1-todo",
         target / "docs" / "sprints" / "2-in-progress",
@@ -2597,31 +2606,44 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
         target / "docs" / "sprints" / "6-archived",
     ]
 
+    # Only create commands/ and scripts/ for normal projects
+    if not maestro_mode:
+        dirs_to_create.extend([
+            target / "commands",
+            target / "scripts",
+        ])
+
     for dir_path in dirs_to_create:
         dir_path.mkdir(parents=True, exist_ok=True)
 
     print(f"✓ Created directory structure")
 
-    # 5. Copy commands from master project
-    print(f"→ Copying commands...")
+    # 6. Copy commands from master project (skip in maestro mode)
     command_count = 0
-    if (master_project / "commands").exists():
-        for cmd_file in (master_project / "commands").glob("*.md"):
-            shutil.copy2(cmd_file, target / "commands" / cmd_file.name)
-            command_count += 1
-    print(f"✓ Copied {command_count} command files")
+    if not maestro_mode:
+        print(f"→ Copying commands...")
+        if (master_project / "commands").exists():
+            for cmd_file in (master_project / "commands").glob("*.md"):
+                shutil.copy2(cmd_file, target / "commands" / cmd_file.name)
+                command_count += 1
+        print(f"✓ Copied {command_count} command files")
+    else:
+        print(f"✓ Skipping commands/ (maestro mode - already exists)")
 
-    # 6. Copy scripts from master project
-    print(f"→ Copying scripts...")
-    if (master_project / "scripts").exists():
-        for script_file in (master_project / "scripts").iterdir():
-            if script_file.is_file():
-                dest = target / "scripts" / script_file.name
-                shutil.copy2(script_file, dest)
-                # Make Python scripts executable
-                if script_file.suffix == ".py":
-                    dest.chmod(0o755)
-    print(f"✓ Copied automation scripts")
+    # 7. Copy scripts from master project (skip in maestro mode)
+    if not maestro_mode:
+        print(f"→ Copying scripts...")
+        if (master_project / "scripts").exists():
+            for script_file in (master_project / "scripts").iterdir():
+                if script_file.is_file():
+                    dest = target / "scripts" / script_file.name
+                    shutil.copy2(script_file, dest)
+                    # Make Python scripts executable
+                    if script_file.suffix == ".py":
+                        dest.chmod(0o755)
+        print(f"✓ Copied automation scripts")
+    else:
+        print(f"✓ Skipping scripts/ (maestro mode - already exists)")
 
     # 7. Copy agents (global + template)
     print(f"→ Copying agents...")
@@ -2749,11 +2771,19 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
 
     # 13. Report success
     print(f"\n{'='*70}")
-    print(f"✅ Project workflow initialized at: {target}")
-    print(f"{'='*70}")
+    if maestro_mode:
+        print(f"✅ Maestro workflow initialized at: {target}")
+        print(f"{'='*70}")
+        print(f"\n🔧 MAESTRO MODE - Dogfooding the workflow")
+        print(f"   Source: ./templates/project/")
+    else:
+        print(f"✅ Project workflow initialized at: {target}")
+        print(f"{'='*70}")
+
     print(f"\nCreated structure:")
-    print(f"├── commands/             ({command_count} command files)")
-    print(f"├── scripts/              (automation)")
+    if not maestro_mode:
+        print(f"├── commands/             ({command_count} command files)")
+        print(f"├── scripts/              (automation)")
     print(f"├── .claude/")
     print(f"│   ├── agents/           ({agent_count} agents)")
     print(f"│   ├── hooks/            ({hook_count} hooks)")
@@ -2770,10 +2800,18 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     print(f"│   ├── 6-archived/")
     print(f"│   └── registry.json")
     print(f"└── CLAUDE.md")
+
     print(f"\nNext steps:")
-    print(f"1. Review and customize CLAUDE.md for your project")
-    print(f"2. Create your first sprint: /sprint-new \"Initial Setup\"")
-    print(f"3. Start working: /sprint-start 1")
+    if maestro_mode:
+        print(f"1. Use sprints to develop maestro itself (dogfooding)")
+        print(f"2. Create sprint: /sprint-new \"Feature Name\"")
+        print(f"3. Start working: /sprint-start N")
+        print(f"4. Publish templates: /maestro-publish (when ready)")
+    else:
+        print(f"1. Review and customize CLAUDE.md for your project")
+        print(f"2. Create your first sprint: /sprint-new \"Initial Setup\"")
+        print(f"3. Start working: /sprint-start 1")
+
     print(f"\nTo sync future updates: /project-update")
     print(f"Workflow version: {workflow_version}")
     print(f"{'='*70}")
@@ -2781,6 +2819,7 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     return {
         "status": "initialized",
         "target": str(target),
+        "maestro_mode": maestro_mode,
         "command_count": command_count,
         "agent_count": agent_count,
         "hook_count": hook_count,

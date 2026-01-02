@@ -1,5 +1,5 @@
 ---
-description: "Initialize a new project with the sprint workflow system"
+description: "Initialize a new project with the sprint workflow system (dual-mode)"
 allowed-tools: [Bash]
 ---
 
@@ -11,14 +11,26 @@ Run the create-project automation command:
 python3 scripts/sprint_lifecycle.py create-project $ARGUMENTS
 ```
 
-This command handles:
-- Creating complete directory structure
-- Copying commands/ and scripts/ from master project
-- Copying agents (global + template)
-- Copying hooks (global + template)
-- Copying configuration files
-- Creating sprint registry
-- Updating .gitignore
+## Dual-Mode Operation
+
+This command automatically detects whether you're initializing:
+- **Maestro mode**: When `templates/project/` exists (maestro repository itself)
+- **Normal mode**: Standard projects using the workflow
+
+### Maestro Mode
+
+When running in claude-maestro repository:
+- Copies FROM `./templates/project/` TO `./.claude/`
+- Skips commands/ and scripts/ (already exist)
+- Enables "dogfooding" - develop maestro using its own workflow
+- Use `/maestro-publish` to export tested changes to other projects
+
+### Normal Mode
+
+When running in a regular project:
+- Copies FROM `~/.claude/templates/project/` TO `./.claude/`
+- Includes commands/ and scripts/ for automation
+- Standard project setup
 
 **Usage:**
 ```
@@ -32,7 +44,9 @@ This command handles:
 /project-create --dry-run          # Preview changes
 ```
 
-**What Gets Copied:**
+## What Gets Copied
+
+### Normal Mode
 
 | Component | Source | Destination |
 |-----------|--------|-------------|
@@ -46,12 +60,30 @@ This command handles:
 | CLAUDE.md | `~/.claude/templates/project/CLAUDE.md` | `./CLAUDE.md` |
 | Sprint Dirs | Created automatically | `./docs/sprints/` |
 
+### Maestro Mode
+
+| Component | Source | Destination |
+|-----------|--------|-------------|
+| Project Agents | `./templates/project/.claude/agents/` | `.claude/agents/` |
+| Project Hooks | `./templates/project/.claude/hooks/` | `.claude/hooks/` |
+| Workflow Config | `./templates/project/.claude/` | `.claude/` |
+| CLAUDE.md | `./templates/project/CLAUDE.md` | `./CLAUDE.md` |
+| Sprint Dirs | Created automatically | `./docs/sprints/` |
+
 **Prerequisites:**
-- Master project must exist at `~/Development/Dreadnought/claude-maestro`
-- Template files must exist at `~/.claude/templates/project/`
 - Target directory must exist
+- **Normal mode**: Master project at `~/Development/Dreadnought/claude-maestro`
+- **Maestro mode**: `templates/project/` directory exists
 
 **Next Steps After Creation:**
+
+**Normal Mode:**
 1. Review and customize CLAUDE.md for your project
 2. Create your first sprint: `/sprint-new "Initial Setup"`
 3. Start working: `/sprint-start 1`
+
+**Maestro Mode:**
+1. Use sprints to develop maestro itself (dogfooding)
+2. Create sprint: `/sprint-new "Feature Name"`
+3. Start working: `/sprint-start N`
+4. Publish templates: `/maestro-publish` (when ready)
