@@ -2191,6 +2191,290 @@ def add_to_epic(sprint_num: int, epic_num: int, dry_run: bool = False) -> dict:
     return summary
 
 
+def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> dict:
+    """
+    Initialize a new project with the complete sprint workflow system.
+
+    Copies commands, scripts, agents, hooks, and configuration from the master
+    template to set up a new project.
+
+    Args:
+        target_path: Target directory path (defaults to current directory)
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with initialization summary
+
+    Raises:
+        FileOperationError: If target doesn't exist or master template not found
+        ValidationError: If project already initialized
+
+    Example:
+        >>> summary = create_project("/path/to/new/project")
+        >>> print(summary['status'])  # 'initialized'
+    """
+    import os
+
+    # 1. Determine target path
+    if target_path:
+        target = Path(target_path).resolve()
+    else:
+        target = Path.cwd().resolve()
+
+    # 2. Validate target
+    if not target.exists():
+        raise FileOperationError(f"Directory not found: {target}")
+
+    # Check if already initialized
+    if (target / ".claude" / "sprint-steps.json").exists():
+        raise ValidationError(
+            f"Project already initialized at {target}\n"
+            f"Use /project-update to sync changes instead."
+        )
+
+    # 3. Define source paths
+    master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
+    global_claude = Path.home() / ".claude"
+    template_path = global_claude / "templates" / "project"
+
+    # Validate master project exists
+    if not master_project.exists():
+        raise FileOperationError(
+            f"Master project not found at {master_project}\n"
+            f"Cannot initialize without template source."
+        )
+
+    if dry_run:
+        print(f"[DRY RUN] Would initialize project at: {target}")
+        print(f"\nWould create structure:")
+        print(f"  ├── commands/ (from {master_project}/commands/)")
+        print(f"  ├── scripts/ (from {master_project}/scripts/)")
+        print(f"  ├── .claude/")
+        print(f"  │   ├── agents/ (global + template)")
+        print(f"  │   ├── hooks/ (global + template)")
+        print(f"  │   ├── settings.json")
+        print(f"  │   ├── sprint-steps.json")
+        print(f"  │   └── WORKFLOW_VERSION")
+        print(f"  ├── docs/sprints/")
+        print(f"  │   ├── 0-backlog/")
+        print(f"  │   ├── 1-todo/")
+        print(f"  │   ├── 2-in-progress/")
+        print(f"  │   ├── 3-done/")
+        print(f"  │   ├── 4-blocked/")
+        print(f"  │   ├── 5-aborted/")
+        print(f"  │   ├── 6-archived/")
+        print(f"  │   └── registry.json")
+        print(f"  ├── CLAUDE.md")
+        print(f"  └── .gitignore (updated)")
+        return {"status": "dry-run", "target": str(target)}
+
+    # 4. Create directory structure
+    print(f"→ Creating directory structure...")
+    dirs_to_create = [
+        target / ".claude" / "agents",
+        target / ".claude" / "hooks",
+        target / "commands",
+        target / "scripts",
+        target / "docs" / "sprints" / "0-backlog",
+        target / "docs" / "sprints" / "1-todo",
+        target / "docs" / "sprints" / "2-in-progress",
+        target / "docs" / "sprints" / "3-done",
+        target / "docs" / "sprints" / "4-blocked",
+        target / "docs" / "sprints" / "5-aborted",
+        target / "docs" / "sprints" / "6-archived",
+    ]
+
+    for dir_path in dirs_to_create:
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+    print(f"✓ Created directory structure")
+
+    # 5. Copy commands from master project
+    print(f"→ Copying commands...")
+    command_count = 0
+    if (master_project / "commands").exists():
+        for cmd_file in (master_project / "commands").glob("*.md"):
+            shutil.copy2(cmd_file, target / "commands" / cmd_file.name)
+            command_count += 1
+    print(f"✓ Copied {command_count} command files")
+
+    # 6. Copy scripts from master project
+    print(f"→ Copying scripts...")
+    if (master_project / "scripts").exists():
+        for script_file in (master_project / "scripts").iterdir():
+            if script_file.is_file():
+                dest = target / "scripts" / script_file.name
+                shutil.copy2(script_file, dest)
+                # Make Python scripts executable
+                if script_file.suffix == ".py":
+                    dest.chmod(0o755)
+    print(f"✓ Copied automation scripts")
+
+    # 7. Copy agents (global + template)
+    print(f"→ Copying agents...")
+    agent_count = 0
+
+    # Copy global agents
+    if (global_claude / "agents").exists():
+        for agent_file in (global_claude / "agents").glob("*.md"):
+            shutil.copy2(agent_file, target / ".claude" / "agents" / agent_file.name)
+            agent_count += 1
+
+    # Copy template agents
+    if (template_path / ".claude" / "agents").exists():
+        for agent_file in (template_path / ".claude" / "agents").glob("*.md"):
+            shutil.copy2(agent_file, target / ".claude" / "agents" / agent_file.name)
+            agent_count += 1
+
+    print(f"✓ Copied {agent_count} agents")
+
+    # 8. Copy hooks (global + template)
+    print(f"→ Copying hooks...")
+    hook_count = 0
+
+    # Copy global hooks
+    if (global_claude / "hooks").exists():
+        for hook_file in (global_claude / "hooks").glob("*.py"):
+            dest = target / ".claude" / "hooks" / hook_file.name
+            shutil.copy2(hook_file, dest)
+            dest.chmod(0o755)
+            hook_count += 1
+
+    # Copy template hooks
+    if (template_path / ".claude" / "hooks").exists():
+        for hook_file in (template_path / ".claude" / "hooks").glob("*.py"):
+            dest = target / ".claude" / "hooks" / hook_file.name
+            shutil.copy2(hook_file, dest)
+            dest.chmod(0o755)
+            hook_count += 1
+
+    print(f"✓ Copied {hook_count} hooks")
+
+    # 9. Copy configuration files
+    print(f"→ Copying configuration...")
+
+    # Copy sprint-steps.json
+    if (template_path / ".claude" / "sprint-steps.json").exists():
+        shutil.copy2(
+            template_path / ".claude" / "sprint-steps.json",
+            target / ".claude" / "sprint-steps.json"
+        )
+
+    # Copy settings.json
+    if (template_path / ".claude" / "settings.json").exists():
+        shutil.copy2(
+            template_path / ".claude" / "settings.json",
+            target / ".claude" / "settings.json"
+        )
+
+    # Copy WORKFLOW_VERSION
+    if (master_project / "WORKFLOW_VERSION").exists():
+        shutil.copy2(
+            master_project / "WORKFLOW_VERSION",
+            target / ".claude" / "WORKFLOW_VERSION"
+        )
+
+    print(f"✓ Copied configuration files")
+
+    # 10. Copy CLAUDE.md (don't overwrite if exists)
+    print(f"→ Copying CLAUDE.md...")
+    if not (target / "CLAUDE.md").exists():
+        if (template_path / "CLAUDE.md").exists():
+            shutil.copy2(template_path / "CLAUDE.md", target / "CLAUDE.md")
+            print(f"✓ Created CLAUDE.md")
+        else:
+            print(f"⚠ Template CLAUDE.md not found, skipping")
+    else:
+        print(f"✓ CLAUDE.md already exists, skipping")
+
+    # 11. Create sprint registry
+    print(f"→ Creating sprint registry...")
+    registry = {
+        "counters": {
+            "next_sprint": 1,
+            "next_epic": 1
+        },
+        "sprints": {},
+        "epics": {}
+    }
+
+    registry_path = target / "docs" / "sprints" / "registry.json"
+    with open(registry_path, 'w') as f:
+        json.dump(registry, f, indent=2)
+
+    print(f"✓ Created sprint registry")
+
+    # 12. Update .gitignore
+    print(f"→ Updating .gitignore...")
+    gitignore_path = target / ".gitignore"
+    gitignore_entries = [
+        "# Sprint workflow state files",
+        ".claude/sprint-*-state.json",
+        ".claude/product-state.json"
+    ]
+
+    if gitignore_path.exists():
+        content = gitignore_path.read_text()
+        if "sprint-.*-state.json" not in content:
+            with open(gitignore_path, 'a') as f:
+                f.write("\n")
+                f.write("\n".join(gitignore_entries))
+                f.write("\n")
+            print(f"✓ Updated .gitignore")
+        else:
+            print(f"✓ .gitignore already configured")
+    else:
+        with open(gitignore_path, 'w') as f:
+            f.write("\n".join(gitignore_entries))
+            f.write("\n")
+        print(f"✓ Created .gitignore")
+
+    # Read workflow version
+    workflow_version = "unknown"
+    if (target / ".claude" / "WORKFLOW_VERSION").exists():
+        workflow_version = (target / ".claude" / "WORKFLOW_VERSION").read_text().strip()
+
+    # 13. Report success
+    print(f"\n{'='*70}")
+    print(f"✅ Project workflow initialized at: {target}")
+    print(f"{'='*70}")
+    print(f"\nCreated structure:")
+    print(f"├── commands/             ({command_count} command files)")
+    print(f"├── scripts/              (automation)")
+    print(f"├── .claude/")
+    print(f"│   ├── agents/           ({agent_count} agents)")
+    print(f"│   ├── hooks/            ({hook_count} hooks)")
+    print(f"│   ├── settings.json")
+    print(f"│   ├── sprint-steps.json")
+    print(f"│   └── WORKFLOW_VERSION")
+    print(f"├── docs/sprints/")
+    print(f"│   ├── 0-backlog/")
+    print(f"│   ├── 1-todo/")
+    print(f"│   ├── 2-in-progress/")
+    print(f"│   ├── 3-done/")
+    print(f"│   ├── 4-blocked/")
+    print(f"│   ├── 5-aborted/")
+    print(f"│   ├── 6-archived/")
+    print(f"│   └── registry.json")
+    print(f"└── CLAUDE.md")
+    print(f"\nNext steps:")
+    print(f"1. Review and customize CLAUDE.md for your project")
+    print(f"2. Create your first sprint: /sprint-new \"Initial Setup\"")
+    print(f"3. Start working: /sprint-start 1")
+    print(f"\nTo sync future updates: /project-update")
+    print(f"Workflow version: {workflow_version}")
+    print(f"{'='*70}")
+
+    return {
+        "status": "initialized",
+        "target": str(target),
+        "command_count": command_count,
+        "agent_count": agent_count,
+        "hook_count": hook_count,
+        "workflow_version": workflow_version
+    }
+
+
 def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     """
     Complete a sprint with full automation: pre-flight checks, file movement,
@@ -2483,6 +2767,13 @@ def main():
     add_epic_parser.add_argument("epic_num", type=int, help="Epic number")
     add_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
 
+    # === PROJECT SETUP COMMANDS ===
+
+    # create-project command
+    create_project_parser = subparsers.add_parser("create-project", help="Initialize new project with workflow")
+    create_project_parser.add_argument("target_path", nargs="?", help="Target directory (default: current)")
+    create_project_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -2646,6 +2937,13 @@ def main():
             result = add_to_epic(args.sprint_num, args.epic_num, dry_run=args.dry_run)
             if not args.dry_run:
                 print(f"✓ Added sprint {result['sprint_num']} to epic {result['epic_num']}")
+
+        # === PROJECT SETUP COMMAND HANDLERS ===
+
+        elif args.command == "create-project":
+            target = getattr(args, 'target_path', None)
+            result = create_project(target_path=target, dry_run=args.dry_run)
+            # Output is handled by create_project() function
 
     except SprintLifecycleError as e:
         print(f"Error: {e}", file=sys.stderr)
