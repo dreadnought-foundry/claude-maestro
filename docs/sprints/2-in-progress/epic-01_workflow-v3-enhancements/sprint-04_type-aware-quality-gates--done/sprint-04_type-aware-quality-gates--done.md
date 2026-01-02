@@ -1,13 +1,15 @@
 ---
 sprint: 4
 title: "Type-Aware Quality Gates"
+type: backend
 epic: 1
-status: in-progress
+status: done
 created: 2026-01-02T11:05:04Z
 started: 2026-01-02T11:05:04Z
-completed: null
+completed: 2026-01-02
 hours: null
 workflow_version: "3.1.0"
+
 
 ---
 
@@ -220,3 +222,44 @@ coverage_threshold: 25  # Override to 25% with justification below
 # Justification: Exploring ML model architecture, code is experimental
 ---
 ```
+
+## Team Strategy
+
+### Sprint Type
+- **Type**: backend-only
+- **Parallelism**: Yes (2 streams)
+
+### Agent Assignments
+
+| Agent | Role | Files Owned |
+|-------|------|-------------|
+| product-engineer | Core Quality Gate Logic Developer | `.claude/hooks/validate_step.py`, `.claude/hooks/sprint_complete_check.py`, `.claude/sprint-steps.json`, `templates/project/.claude/hooks/validate_step.py`, `templates/project/.claude/hooks/sprint_complete_check.py` |
+| quality-engineer | Testing, Documentation & Validation | `tests/test_type_aware_quality_gates.py`, `docs/patterns/sprint-type-classification.md`, `CLAUDE.md` |
+
+### File Ownership
+
+- **product-engineer owns**: All hook files and step definitions
+- **quality-engineer owns**: Tests, patterns documentation, and CLAUDE.md updates
+
+### Integration Strategy
+
+1. product-engineer defines `QUALITY_GATES` config structure
+2. PARALLEL: product-engineer implements logic while quality-engineer writes tests/docs
+3. quality-engineer runs tests against product-engineer's implementation
+4. product-engineer updates template mirrors
+5. Final validation
+
+### TDD Approach
+
+**Flexible** - Standard validation feature with straightforward rules. 75% coverage target.
+
+### Clarifications
+
+1. **Default Type**: Sprints without `type` field → default to `fullstack` with warning
+2. **Overrides**: Justification comment required (self-service)
+3. **Type Changes**: Allowed mid-sprint with warning about gate implications
+
+
+## Postmortem
+
+See [Sprint 4 Postmortem](./sprint-4_postmortem.md)

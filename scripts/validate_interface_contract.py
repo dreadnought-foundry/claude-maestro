@@ -23,6 +23,7 @@ from typing import Dict, List, Tuple, Any, Optional
 
 try:
     import jsonschema
+
     HAS_JSONSCHEMA = True
 except ImportError:
     HAS_JSONSCHEMA = False
@@ -30,6 +31,7 @@ except ImportError:
 
 class ContractValidationError(Exception):
     """Raised when contract validation fails."""
+
     pass
 
 
@@ -116,7 +118,13 @@ class InterfaceContractValidator:
 
         if "type" not in contract:
             errors.append("Required field 'type' missing")
-        elif contract["type"] not in ["fullstack", "backend-only", "frontend-only", "integration", "data-layer"]:
+        elif contract["type"] not in [
+            "fullstack",
+            "backend-only",
+            "frontend-only",
+            "integration",
+            "data-layer",
+        ]:
             errors.append(f"Invalid sprint type: {contract['type']}")
 
         if "backend_interface" not in contract:
@@ -150,7 +158,7 @@ class InterfaceContractValidator:
                     )
 
                 # Check for valid enum value format (UPPERCASE with underscores)
-                if not re.match(r'^[A-Z][A-Z0-9_]*$', value):
+                if not re.match(r"^[A-Z][A-Z0-9_]*$", value):
                     errors.append(
                         f"Enum value '{value}' in enum '{enum_name}' contains invalid characters. "
                         f"Use only UPPERCASE letters, numbers, and underscores."
@@ -229,7 +237,9 @@ class InterfaceContractValidator:
                 continue
 
             return_type = return_spec.replace("returns:", "").strip()
-            errors.extend(self._validate_graphql_type(mutation_name, return_type, backend))
+            errors.extend(
+                self._validate_graphql_type(mutation_name, return_type, backend)
+            )
 
         # Validate nested type fields
         types = backend.get("types", {})
@@ -239,10 +249,7 @@ class InterfaceContractValidator:
         return errors
 
     def _validate_graphql_type(
-        self,
-        field_name: str,
-        graphql_type: str,
-        backend: Dict[str, Any]
+        self, field_name: str, graphql_type: str, backend: Dict[str, Any]
     ) -> List[str]:
         """
         Validate a GraphQL type reference.
@@ -258,7 +265,9 @@ class InterfaceContractValidator:
         errors = []
 
         # Extract base type from GraphQL notation
-        base_type = graphql_type.replace("[", "").replace("]", "").replace("!", "").strip()
+        base_type = (
+            graphql_type.replace("[", "").replace("]", "").replace("!", "").strip()
+        )
 
         # Check if it's a scalar type
         scalar_types = {"String", "Int", "Float", "Boolean", "ID"}
@@ -278,10 +287,7 @@ class InterfaceContractValidator:
         return errors
 
     def _validate_nested_type(
-        self,
-        type_name: str,
-        type_fields: Dict[str, Any],
-        backend: Dict[str, Any]
+        self, type_name: str, type_fields: Dict[str, Any], backend: Dict[str, Any]
     ) -> List[str]:
         """
         Validate nested type definitions recursively.
@@ -299,29 +305,29 @@ class InterfaceContractValidator:
         for field_name, field_def in type_fields.items():
             # Handle simple string type definition
             if isinstance(field_def, str):
-                errors.extend(self._validate_graphql_type(
-                    f"{type_name}.{field_name}",
-                    field_def,
-                    backend
-                ))
+                errors.extend(
+                    self._validate_graphql_type(
+                        f"{type_name}.{field_name}", field_def, backend
+                    )
+                )
 
             # Handle complex nested type definition
             elif isinstance(field_def, dict):
                 field_type = field_def.get("type", "")
-                errors.extend(self._validate_graphql_type(
-                    f"{type_name}.{field_name}",
-                    field_type,
-                    backend
-                ))
+                errors.extend(
+                    self._validate_graphql_type(
+                        f"{type_name}.{field_name}", field_type, backend
+                    )
+                )
 
                 # Recursively validate nested fields
                 if "fields" in field_def:
                     nested_type_name = f"{type_name}.{field_name}"
-                    errors.extend(self._validate_nested_type(
-                        nested_type_name,
-                        field_def["fields"],
-                        backend
-                    ))
+                    errors.extend(
+                        self._validate_nested_type(
+                            nested_type_name, field_def["fields"], backend
+                        )
+                    )
 
         return errors
 
@@ -405,7 +411,9 @@ def main():
         contract_path = find_contract_for_sprint(sprint_num)
         if contract_path is None:
             print(f"Error: No contract found for sprint {sprint_num}")
-            print(f"Expected location: docs/sprints/**/sprint-{sprint_num:02d}_*/contract-sprint-{sprint_num}.json")
+            print(
+                f"Expected location: docs/sprints/**/sprint-{sprint_num:02d}_*/contract-sprint-{sprint_num}.json"
+            )
             print(f"Alternative location: .claude/sprint-{sprint_num}-contract.json")
             sys.exit(1)
     else:

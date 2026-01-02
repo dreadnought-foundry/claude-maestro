@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def main():
     project_root = Path(__file__).parent.parent
     passed = 0
@@ -89,7 +90,7 @@ def main():
         [sys.executable, "scripts/sprint_lifecycle.py", "complete-sprint", "--help"],
         cwd=project_root,
         capture_output=True,
-        text=True
+        text=True,
     )
     if result.returncode == 0:
         print("✓ PASS: Automation script is callable")
@@ -126,6 +127,7 @@ def main():
     else:
         print(f"✗ {failed} checks failed")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

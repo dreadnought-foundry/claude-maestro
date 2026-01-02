@@ -13,6 +13,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Import sprint type utilities
+try:
+    from validate_step import get_sprint_type, get_coverage_threshold, QUALITY_GATES
+except ImportError:
+    # If running from different directory, try absolute import
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("validate_step", Path(__file__).parent / "validate_step.py")
+    validate_step = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validate_step)
+    get_sprint_type = validate_step.get_sprint_type
+    get_coverage_threshold = validate_step.get_coverage_threshold
+    QUALITY_GATES = validate_step.QUALITY_GATES
+
 STATE_FILE = Path(".claude/sprint-state.json")
 SPRINT_LIFECYCLE = Path("scripts/sprint_lifecycle.py")
 
@@ -107,7 +120,13 @@ def main():
         state = json.load(f)
 
     sprint_num = state.get("sprint_number", "?")
+    sprint_type = get_sprint_type(state)
+    coverage_threshold = get_coverage_threshold(state)
+    quality_gates = QUALITY_GATES[sprint_type]
+
     print(f"Running pre-flight checklist for Sprint {sprint_num}...")
+    print(f"Sprint type: {sprint_type}")
+    print(f"Coverage threshold: {coverage_threshold}%")
     print()
 
     failures = []
@@ -151,19 +170,45 @@ def main():
     # 4-9 are checked from state file (set by earlier steps)
     checklist = state.get("pre_flight_checklist", {})
 
+    # Base optional checks
     optional_checks = [
         ("migrations_verified", "4. Database migrations"),
         ("sample_data_generated", "5. Sample data"),
         ("mcp_tools_tested", "6. MCP tools"),
-        ("dialog_example_created", "7. Dialog example"),
         ("sprint_file_updated", "8. Sprint file updated"),
         ("code_has_docstrings", "9. Code docstrings"),
     ]
 
+    # Type-specific checks
+    if quality_gates.get("documentation"):
+        # Research and spike sprints REQUIRE documentation
+        optional_checks.insert(3, ("dialog_example_created", "7. Dialog example (REQUIRED)"))
+    else:
+        # Other sprint types have documentation as optional
+        optional_checks.insert(3, ("dialog_example_created", "7. Dialog example"))
+
+    if quality_gates.get("integration_tests"):
+        optional_checks.append(("integration_tests_passing", "10. Integration tests"))
+
+    if quality_gates.get("visual_regression"):
+        optional_checks.append(("visual_regression_tested", "11. Visual regression tests"))
+
+    if quality_gates.get("smoke_tests"):
+        optional_checks.append(("smoke_tests_passing", "12. Smoke tests"))
+
     for key, name in optional_checks:
         value = checklist.get(key)
         print(f"{name}...", end=" ")
-        if value is True:
+
+        # For REQUIRED items (research/spike documentation)
+        if quality_gates.get("documentation") and key == "dialog_example_created":
+            if value is True:
+                print("PASS")
+            else:
+                print("FAIL")
+                failures.append((name, "Documentation is REQUIRED for research/spike sprints"))
+        # For regular optional items
+        elif value is True:
             print("PASS")
         elif value is False:
             print("FAIL")

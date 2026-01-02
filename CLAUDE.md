@@ -70,3 +70,55 @@ For a project to use this workflow, it needs:
 - Cannot commit before Phase 5
 - Cannot complete without all checklist items passing
 - Every step recorded with timestamp for audit trail
+
+## Sprint Types
+
+The workflow supports 6 sprint types with different quality gates to reduce false failures and enable experimental work:
+
+| Type | Coverage | Key Requirements |
+|------|----------|-----------------|
+| fullstack | 75% | Integration tests recommended |
+| backend | 85% | Integration tests required |
+| frontend | 70% | Visual regression tests |
+| research | 30% | Documentation mandatory |
+| spike | 0% | Documentation mandatory |
+| infrastructure | 60% | Smoke tests required |
+
+### Usage
+
+Add to sprint frontmatter:
+```yaml
+---
+sprint: 42
+type: backend
+coverage_threshold: 80  # Optional override
+# Justification: Higher threshold due to critical validation logic
+---
+```
+
+### Default Behavior
+
+- Sprints without a `type` field default to `fullstack` (75% coverage)
+- A warning will be logged for sprints missing the type field
+
+### Coverage Override
+
+You can override the default coverage threshold with justification:
+
+```yaml
+coverage_threshold: 65
+# Justification: Integrating with external API, some paths not testable locally
+```
+
+**Rules**:
+- Justification comment required (must include "Justification:")
+- Valid range: 0-100%
+- Self-service (no approval needed)
+
+### Choosing the Right Type
+
+See `docs/patterns/sprint-type-classification.md` for detailed guidance including:
+- Decision tree for choosing sprint type
+- Examples of each type
+- Common scenarios and recommendations
+- Override best practices

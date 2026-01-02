@@ -11,17 +11,16 @@ These tests validate:
 """
 
 import json
-import shutil
 import subprocess
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
 # Import functions from sprint_lifecycle.py
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.sprint_lifecycle import (
@@ -34,7 +33,6 @@ from scripts.sprint_lifecycle import (
     _find_sprint_file,
     _is_epic_sprint,
     _update_yaml_frontmatter,
-    SprintLifecycleError,
     GitError,
     FileOperationError,
     ValidationError,
@@ -52,7 +50,9 @@ def temp_project():
         (project_root / "docs" / "sprints" / "0-backlog").mkdir(parents=True)
         (project_root / "docs" / "sprints" / "1-todo").mkdir(parents=True)
         (project_root / "docs" / "sprints" / "2-in-progress").mkdir(parents=True)
-        (project_root / "docs" / "sprints" / "3-done" / "_standalone").mkdir(parents=True)
+        (project_root / "docs" / "sprints" / "3-done" / "_standalone").mkdir(
+            parents=True
+        )
         (project_root / "scripts").mkdir()
 
         yield project_root
@@ -61,7 +61,9 @@ def temp_project():
 @pytest.fixture
 def sprint_file_standalone(temp_project):
     """Create a standalone sprint file in 2-in-progress."""
-    sprint_path = temp_project / "docs" / "sprints" / "2-in-progress" / "sprint-05_test-sprint.md"
+    sprint_path = (
+        temp_project / "docs" / "sprints" / "2-in-progress" / "sprint-05_test-sprint.md"
+    )
     content = """---
 sprint: 5
 title: Test Sprint
@@ -124,7 +126,9 @@ epic: 2
 
     # Create epic metadata file
     epic_file = epic_dir / "_epic.md"
-    epic_file.write_text("# Epic 02: Test Epic\n\n## Sprints\n- Sprint 10\n- Sprint 11\n")
+    epic_file.write_text(
+        "# Epic 02: Test Epic\n\n## Sprints\n- Sprint 10\n- Sprint 11\n"
+    )
 
     return sprint_path
 
@@ -134,7 +138,7 @@ class TestFindProjectRoot:
 
     def test_find_from_root(self, temp_project):
         """Should find project root when already at root."""
-        with patch('pathlib.Path.cwd', return_value=temp_project):
+        with patch("pathlib.Path.cwd", return_value=temp_project):
             root = find_project_root()
             # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
             assert root.resolve() == temp_project.resolve()
@@ -142,7 +146,7 @@ class TestFindProjectRoot:
     def test_find_from_subdirectory(self, temp_project):
         """Should find project root when in subdirectory."""
         subdir = temp_project / "docs" / "sprints"
-        with patch('pathlib.Path.cwd', return_value=subdir):
+        with patch("pathlib.Path.cwd", return_value=subdir):
             root = find_project_root()
             # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
             assert root.resolve() == temp_project.resolve()
@@ -151,7 +155,7 @@ class TestFindProjectRoot:
         """Should find project root when in deep subdirectory."""
         deep_dir = temp_project / "docs" / "sprints" / "2-in-progress" / "epic-01_test"
         deep_dir.mkdir(parents=True)
-        with patch('pathlib.Path.cwd', return_value=deep_dir):
+        with patch("pathlib.Path.cwd", return_value=deep_dir):
             root = find_project_root()
             # Resolve both paths to handle symlinks (/var -> /private/var on macOS)
             assert root.resolve() == temp_project.resolve()
@@ -159,8 +163,10 @@ class TestFindProjectRoot:
     def test_error_when_no_claude_dir(self):
         """Should raise error when no .claude/ directory found."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch('pathlib.Path.cwd', return_value=Path(tmpdir)):
-                with pytest.raises(FileOperationError, match="Could not find project root"):
+            with patch("pathlib.Path.cwd", return_value=Path(tmpdir)):
+                with pytest.raises(
+                    FileOperationError, match="Could not find project root"
+                ):
                     find_project_root()
 
 
@@ -200,7 +206,14 @@ class TestIsEpicSprint:
 
     def test_extracts_epic_number(self, temp_project):
         """Should correctly extract epic number from path."""
-        path = temp_project / "docs" / "sprints" / "2-in-progress" / "epic-15_big-epic" / "sprint-01_test.md"
+        path = (
+            temp_project
+            / "docs"
+            / "sprints"
+            / "2-in-progress"
+            / "epic-15_big-epic"
+            / "sprint-01_test.md"
+        )
         is_epic, epic_num = _is_epic_sprint(path)
         assert is_epic is True
         assert epic_num == 15
@@ -268,10 +281,19 @@ class TestMoveToDone:
 
     def test_move_standalone_sprint(self, temp_project, sprint_file_standalone):
         """Should move standalone sprint to 3-done/_standalone/."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             new_path = move_to_done(5)
 
-        expected_path = temp_project / "docs" / "sprints" / "3-done" / "_standalone" / "sprint-05_test-sprint--done.md"
+        expected_path = (
+            temp_project
+            / "docs"
+            / "sprints"
+            / "3-done"
+            / "_standalone"
+            / "sprint-05_test-sprint--done.md"
+        )
         assert new_path == expected_path
         assert expected_path.exists()
         assert not sprint_file_standalone.exists()
@@ -285,7 +307,9 @@ class TestMoveToDone:
 
     def test_rename_epic_sprint_in_place(self, temp_project, sprint_file_epic):
         """Should rename epic sprint with --done suffix in epic folder."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             new_path = move_to_done(10)
 
         expected_path = sprint_file_epic.parent / "sprint-10_epic-sprint--done.md"
@@ -302,25 +326,40 @@ class TestMoveToDone:
 
     def test_error_when_sprint_not_found(self, temp_project):
         """Should raise error when sprint file doesn't exist."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             with pytest.raises(FileOperationError, match="Sprint 999 not found"):
                 move_to_done(999)
 
     def test_error_when_already_done(self, temp_project):
         """Should raise error when sprint already marked done."""
-        done_sprint = temp_project / "docs" / "sprints" / "3-done" / "_standalone" / "sprint-03_old--done.md"
+        done_sprint = (
+            temp_project
+            / "docs"
+            / "sprints"
+            / "3-done"
+            / "_standalone"
+            / "sprint-03_old--done.md"
+        )
         done_sprint.parent.mkdir(parents=True, exist_ok=True)
         done_sprint.write_text("---\nstatus: done\n---\n# Sprint")
 
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            with patch('scripts.sprint_lifecycle._find_sprint_file', return_value=done_sprint):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            with patch(
+                "scripts.sprint_lifecycle._find_sprint_file", return_value=done_sprint
+            ):
                 with pytest.raises(ValidationError, match="already marked as done"):
                     move_to_done(3)
 
     def test_dry_run_mode(self, temp_project, sprint_file_standalone, capsys):
         """Should preview changes without executing in dry-run mode."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            new_path = move_to_done(5, dry_run=True)
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            move_to_done(5, dry_run=True)
 
         # File should not have moved
         assert sprint_file_standalone.exists()
@@ -336,8 +375,10 @@ class TestUpdateRegistry:
 
     def test_create_registry_if_missing(self, temp_project):
         """Should create registry file if it doesn't exist."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            update_registry(5, status='done', completed='2025-12-30', hours=6)
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            update_registry(5, status="done", completed="2025-12-30", hours=6)
 
         registry_path = temp_project / "docs" / "sprints" / "registry.json"
         assert registry_path.exists()
@@ -355,17 +396,14 @@ class TestUpdateRegistry:
         registry_path = temp_project / "docs" / "sprints" / "registry.json"
         registry_path.parent.mkdir(parents=True, exist_ok=True)
 
-        existing = {
-            "version": "1.0",
-            "sprints": {
-                "3": {"status": "in-progress"}
-            }
-        }
-        with open(registry_path, 'w') as f:
+        existing = {"version": "1.0", "sprints": {"3": {"status": "in-progress"}}}
+        with open(registry_path, "w") as f:
             json.dump(existing, f)
 
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            update_registry(5, status='done', hours=4.5)
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            update_registry(5, status="done", hours=4.5)
 
         with open(registry_path) as f:
             registry = json.load(f)
@@ -381,8 +419,10 @@ class TestUpdateRegistry:
 
     def test_dry_run_mode(self, temp_project, capsys):
         """Should preview registry updates in dry-run mode."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            update_registry(5, status='done', hours=3, dry_run=True)
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            update_registry(5, status="done", hours=3, dry_run=True)
 
         registry_path = temp_project / "docs" / "sprints" / "registry.json"
         assert not registry_path.exists()
@@ -406,7 +446,9 @@ class TestCheckEpicCompletion:
         (epic_dir / "sprint-02_second--done.md").write_text("# Sprint 2")
         (epic_dir / "_epic.md").write_text("# Epic 03")
 
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             is_complete, message = check_epic_completion(3)
 
         assert is_complete is True
@@ -423,7 +465,9 @@ class TestCheckEpicCompletion:
         (epic_dir / "sprint-02_second.md").write_text("# Sprint 2")  # Still active
         (epic_dir / "_epic.md").write_text("# Epic 04")
 
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             is_complete, message = check_epic_completion(4)
 
         assert is_complete is False
@@ -440,7 +484,9 @@ class TestCheckEpicCompletion:
         (epic_dir / "sprint-02_second--aborted.md").write_text("# Sprint 2")
         (epic_dir / "_epic.md").write_text("# Epic 05")
 
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             is_complete, message = check_epic_completion(5)
 
         assert is_complete is True
@@ -450,7 +496,9 @@ class TestCheckEpicCompletion:
 
     def test_epic_not_found(self, temp_project):
         """Should return error message when epic doesn't exist."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
             is_complete, message = check_epic_completion(999)
 
         assert is_complete is False
@@ -462,28 +510,28 @@ class TestCheckGitClean:
 
     def test_clean_working_directory(self):
         """Should return True when git status is clean."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(stdout="", returncode=0)
             assert check_git_clean() is True
 
     def test_dirty_working_directory(self):
         """Should return False when uncommitted changes exist."""
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             mock_run.return_value = Mock(stdout=" M file.py\n", returncode=0)
             assert check_git_clean() is False
 
     def test_error_returns_false(self):
         """Should return False on git command error."""
-        with patch('subprocess.run') as mock_run:
-            mock_run.side_effect = subprocess.CalledProcessError(1, 'git')
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.CalledProcessError(1, "git")
             assert check_git_clean() is False
 
 
 class TestCreateGitTag:
     """Test git tag creation."""
 
-    @patch('scripts.sprint_lifecycle.check_git_clean', return_value=True)
-    @patch('subprocess.run')
+    @patch("scripts.sprint_lifecycle.check_git_clean", return_value=True)
+    @patch("subprocess.run")
     def test_create_tag_with_push(self, mock_run, mock_clean):
         """Should create annotated tag and push to remote."""
         mock_run.return_value = Mock(returncode=0, stderr="")
@@ -501,8 +549,8 @@ class TestCreateGitTag:
         push_call = mock_run.call_args_list[1]
         assert push_call[0][0] == ["git", "push", "origin", "sprint-5"]
 
-    @patch('scripts.sprint_lifecycle.check_git_clean', return_value=True)
-    @patch('subprocess.run')
+    @patch("scripts.sprint_lifecycle.check_git_clean", return_value=True)
+    @patch("subprocess.run")
     def test_create_tag_without_push(self, mock_run, mock_clean):
         """Should create tag without pushing."""
         mock_run.return_value = Mock(returncode=0, stderr="")
@@ -514,14 +562,14 @@ class TestCreateGitTag:
         tag_call = mock_run.call_args_list[0]
         assert "git tag -a" in " ".join(tag_call[0][0])
 
-    @patch('scripts.sprint_lifecycle.check_git_clean', return_value=False)
+    @patch("scripts.sprint_lifecycle.check_git_clean", return_value=False)
     def test_error_on_dirty_working_tree(self, mock_clean):
         """Should raise error when working directory is dirty."""
         with pytest.raises(ValidationError, match="working directory is dirty"):
             create_git_tag(5, "Test Sprint")
 
-    @patch('scripts.sprint_lifecycle.check_git_clean', return_value=True)
-    @patch('subprocess.run')
+    @patch("scripts.sprint_lifecycle.check_git_clean", return_value=True)
+    @patch("subprocess.run")
     def test_dry_run_mode(self, mock_run, mock_clean, capsys):
         """Should preview tag creation in dry-run mode."""
         create_git_tag(5, "Test Sprint", dry_run=True, auto_push=True)
@@ -535,11 +583,13 @@ class TestCreateGitTag:
         assert "sprint-5" in captured.out
         assert "Auto-push: Yes" in captured.out
 
-    @patch('scripts.sprint_lifecycle.check_git_clean', return_value=True)
-    @patch('subprocess.run')
+    @patch("scripts.sprint_lifecycle.check_git_clean", return_value=True)
+    @patch("subprocess.run")
     def test_error_on_git_failure(self, mock_run, mock_clean):
         """Should raise GitError when git command fails."""
-        mock_run.side_effect = subprocess.CalledProcessError(1, 'git', stderr="Tag already exists")
+        mock_run.side_effect = subprocess.CalledProcessError(
+            1, "git", stderr="Tag already exists"
+        )
 
         with pytest.raises(GitError, match="Failed to create/push git tag"):
             create_git_tag(5, "Test Sprint")
@@ -548,11 +598,15 @@ class TestCreateGitTag:
 class TestIntegrationScenarios:
     """Integration tests for complete workflows."""
 
-    def test_complete_sprint_workflow_standalone(self, temp_project, sprint_file_standalone):
+    def test_complete_sprint_workflow_standalone(
+        self, temp_project, sprint_file_standalone
+    ):
         """Test complete workflow for standalone sprint."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            with patch('scripts.sprint_lifecycle.check_git_clean', return_value=True):
-                with patch('subprocess.run') as mock_git:
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            with patch("scripts.sprint_lifecycle.check_git_clean", return_value=True):
+                with patch("subprocess.run") as mock_git:
                     mock_git.return_value = Mock(returncode=0, stderr="")
 
                     # Move to done
@@ -561,7 +615,7 @@ class TestIntegrationScenarios:
                     assert "_standalone" in str(new_path)
 
                     # Update registry
-                    update_registry(5, status='done', completed='2025-12-30', hours=6)
+                    update_registry(5, status="done", completed="2025-12-30", hours=6)
 
                     # Create tag
                     create_git_tag(5, "Test Sprint", auto_push=True)
@@ -580,9 +634,11 @@ class TestIntegrationScenarios:
 
     def test_complete_sprint_workflow_epic(self, temp_project, sprint_file_epic):
         """Test complete workflow for epic sprint."""
-        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
-            with patch('scripts.sprint_lifecycle.check_git_clean', return_value=True):
-                with patch('subprocess.run') as mock_git:
+        with patch(
+            "scripts.sprint_lifecycle.find_project_root", return_value=temp_project
+        ):
+            with patch("scripts.sprint_lifecycle.check_git_clean", return_value=True):
+                with patch("subprocess.run") as mock_git:
                     mock_git.return_value = Mock(returncode=0, stderr="")
 
                     # Move to done (stays in epic folder)
@@ -591,7 +647,7 @@ class TestIntegrationScenarios:
                     assert "epic-02_test-epic" in str(new_path)
 
                     # Update registry
-                    update_registry(10, status='done', hours=5)
+                    update_registry(10, status="done", hours=5)
 
                     # Check epic completion
                     is_complete, msg = check_epic_completion(2)

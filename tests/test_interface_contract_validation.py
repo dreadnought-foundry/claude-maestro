@@ -16,12 +16,10 @@ import json
 import tempfile
 import time
 from pathlib import Path
-import pytest
 
 from scripts.validate_interface_contract import (
     InterfaceContractValidator,
     find_contract_for_sprint,
-    ContractValidationError
 )
 
 
@@ -38,27 +36,23 @@ class TestContractValidation:
                 "sprint": 1,
                 "type": "fullstack",
                 "backend_interface": {
-                    "queries": {
-                        "userFeatures": "returns: [Feature!]!"
-                    },
+                    "queries": {"userFeatures": "returns: [Feature!]!"},
                     "types": {
                         "Feature": {
                             "key": "String!",
                             "name": "String!",
-                            "enabled": "Boolean!"
+                            "enabled": "Boolean!",
                         }
                     },
-                    "enums": {
-                        "FeatureStatus": ["ENABLED", "DISABLED", "BETA"]
-                    }
+                    "enums": {"FeatureStatus": ["ENABLED", "DISABLED", "BETA"]},
                 },
                 "frontend_interface": {
                     "hooks": ["useFeatures"],
-                    "types": ["Feature", "FeatureStatus"]
-                }
+                    "types": ["Feature", "FeatureStatus"],
+                },
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -77,15 +71,17 @@ class TestContractValidation:
                 "type": "fullstack",
                 "backend_interface": {
                     "enums": {
-                        "FeatureStatus": ["enabled", "DISABLED", "Beta"]  # lowercase + mixed case
+                        "FeatureStatus": [
+                            "enabled",
+                            "DISABLED",
+                            "Beta",
+                        ]  # lowercase + mixed case
                     }
                 },
-                "frontend_interface": {
-                    "types": ["FeatureStatus"]
-                }
+                "frontend_interface": {"types": ["FeatureStatus"]},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -104,26 +100,22 @@ class TestContractValidation:
             contract = {
                 "sprint": 1,
                 "type": "fullstack",
-                "backend_interface": {
-                    "types": {
-                        "Feature": {
-                            "key": "String!"
-                        }
-                    }
-                },
+                "backend_interface": {"types": {"Feature": {"key": "String!"}}},
                 "frontend_interface": {
                     "types": ["Feature", "NonExistentType", "AnotherMissingType"]
-                }
+                },
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
 
             assert is_valid is False
             assert len(errors) >= 2
-            assert any("NonExistentType" in err and "not defined" in err for err in errors)
+            assert any(
+                "NonExistentType" in err and "not defined" in err for err in errors
+            )
             assert any("AnotherMissingType" in err for err in errors)
 
     def test_missing_required_fields_fail(self):
@@ -138,7 +130,7 @@ class TestContractValidation:
                 # Missing backend_interface and frontend_interface
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -157,10 +149,10 @@ class TestContractValidation:
                 "sprint": 1,
                 "type": "backend-only",
                 "backend_interface": {},
-                "frontend_interface": {}
+                "frontend_interface": {},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -184,24 +176,16 @@ class TestContractValidation:
                             "key": "String!",
                             "metadata": {
                                 "type": "[MetadataField!]",
-                                "fields": {
-                                    "key": "String!",
-                                    "value": "String!"
-                                }
-                            }
+                                "fields": {"key": "String!", "value": "String!"},
+                            },
                         },
-                        "MetadataField": {
-                            "key": "String!",
-                            "value": "String!"
-                        }
+                        "MetadataField": {"key": "String!", "value": "String!"},
                     }
                 },
-                "frontend_interface": {
-                    "types": ["Feature", "MetadataField"]
-                }
+                "frontend_interface": {"types": ["Feature", "MetadataField"]},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -223,17 +207,15 @@ class TestContractValidation:
                         "Feature": {
                             "metadata": {
                                 "type": "[UndefinedType!]",  # Not defined anywhere
-                                "fields": {}
+                                "fields": {},
                             }
                         }
                     }
                 },
-                "frontend_interface": {
-                    "types": ["Feature"]
-                }
+                "frontend_interface": {"types": ["Feature"]},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -255,10 +237,10 @@ class TestContractValidation:
                         "getFeature": "returns: UndefinedType!"  # Type not defined
                     }
                 },
-                "frontend_interface": {}
+                "frontend_interface": {},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
@@ -277,18 +259,27 @@ class TestContractValidation:
                 "type": "fullstack",
                 "backend_interface": {},
                 "frontend_interface": {
-                    "hooks": ["getFeatures", "useFeatures", "fetchData"]  # Invalid: should start with 'use'
-                }
+                    "hooks": [
+                        "getFeatures",
+                        "useFeatures",
+                        "fetchData",
+                    ]  # Invalid: should start with 'use'
+                },
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)
 
             assert is_valid is False
-            assert any("getFeatures" in err and "must start with 'use'" in err for err in errors)
-            assert any("fetchData" in err and "must start with 'use'" in err for err in errors)
+            assert any(
+                "getFeatures" in err and "must start with 'use'" in err
+                for err in errors
+            )
+            assert any(
+                "fetchData" in err and "must start with 'use'" in err for err in errors
+            )
 
     def test_validation_performance(self):
         """Should validate contract in < 5 seconds."""
@@ -300,9 +291,7 @@ class TestContractValidation:
             # Create a large contract with many types
             types = {}
             for i in range(100):
-                types[f"Type{i}"] = {
-                    f"field{j}": "String!" for j in range(20)
-                }
+                types[f"Type{i}"] = {f"field{j}": "String!" for j in range(20)}
 
             contract = {
                 "sprint": 1,
@@ -310,16 +299,13 @@ class TestContractValidation:
                 "backend_interface": {
                     "types": types,
                     "enums": {
-                        f"Enum{i}": [f"VALUE_{j}" for j in range(10)]
-                        for i in range(50)
-                    }
+                        f"Enum{i}": [f"VALUE_{j}" for j in range(10)] for i in range(50)
+                    },
                 },
-                "frontend_interface": {
-                    "types": [f"Type{i}" for i in range(100)]
-                }
+                "frontend_interface": {"types": [f"Type{i}" for i in range(100)]},
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             start_time = time.time()
@@ -336,7 +322,7 @@ class TestContractValidation:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             contract_path = Path(tmpdir) / "contract.json"
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 f.write("{ invalid json }")
 
             is_valid, errors = validator.validate(contract_path)
@@ -371,6 +357,7 @@ class TestContractDiscovery:
 
             # Change to tmpdir to simulate project root
             import os
+
             original_dir = os.getcwd()
             try:
                 os.chdir(tmpdir)
@@ -390,6 +377,7 @@ class TestContractDiscovery:
             contract_path.write_text("{}")
 
             import os
+
             original_dir = os.getcwd()
             try:
                 os.chdir(tmpdir)
@@ -403,6 +391,7 @@ class TestContractDiscovery:
         """Should return None when contract not found."""
         with tempfile.TemporaryDirectory() as tmpdir:
             import os
+
             original_dir = os.getcwd()
             try:
                 os.chdir(tmpdir)
@@ -429,15 +418,15 @@ class TestIntegration:
                 "backend_interface": {
                     "queries": {"getUsers": "returns: [User!]!"},
                     "types": {"User": {"id": "ID!", "name": "String!"}},
-                    "enums": {"UserRole": ["ADMIN", "USER"]}
+                    "enums": {"UserRole": ["ADMIN", "USER"]},
                 },
                 "frontend_interface": {
                     "hooks": ["useUsers"],
-                    "types": ["User", "UserRole"]
-                }
+                    "types": ["User", "UserRole"],
+                },
             }
 
-            with open(contract_path, 'w') as f:
+            with open(contract_path, "w") as f:
                 json.dump(contract, f)
 
             is_valid, errors = validator.validate(contract_path)

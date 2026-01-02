@@ -1,0 +1,50 @@
+# Pre-commit hooks configuration
+# See https://pre-commit.com for more information
+
+repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(scripts|tests)/.*\.py$
+      - id: ruff-format
+        files: ^(scripts|tests)/.*\.py$
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: (\.md$|/generated/)
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags in frontmatter
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.0
+    hooks:
+      - id: bandit
+        args: [-ll]  # Low severity, low confidence threshold
+        files: ^scripts/.*\.py$
+        exclude: tests/
+
+# CI settings (if using pre-commit.ci)
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

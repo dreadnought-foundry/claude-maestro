@@ -221,15 +221,15 @@
         {
           "step": "5.1",
           "name": "Coverage Gate",
-          "description": "Verify test coverage meets 75% threshold before committing",
+          "description": "Verify test coverage meets sprint-type-aware threshold before committing",
           "agent": "test-runner",
           "validation": {
             "type": "coverage_check",
-            "check": "coverage >= 75%"
+            "check": "coverage >= sprint_type_threshold"
           },
           "outputs": ["coverage_percentage"],
           "gate": true,
-          "gate_message": "Test coverage must be at least 75% before committing. Current coverage: {coverage_percentage}%"
+          "gate_message": "Test coverage must meet sprint type threshold before committing. Current coverage: {coverage_percentage}%"
         },
         {
           "step": "5.2",

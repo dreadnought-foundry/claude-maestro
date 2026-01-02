@@ -8,11 +8,8 @@ These tests validate:
 """
 
 import json
-import os
 import re
-import tempfile
 from pathlib import Path
-from datetime import datetime
 
 import pytest
 
@@ -25,14 +22,17 @@ SPRINT_STEPS_FILE = Path.home() / ".claude" / "sprint-steps.json"
 class TestSprintCommandFilesExist:
     """Verify all sprint command files exist."""
 
-    @pytest.mark.parametrize("command_name", [
-        "sprint-start",
-        "sprint-status",
-        "sprint-next",
-        "sprint-complete",
-        "sprint-abort",
-        "sprint-new",
-    ])
+    @pytest.mark.parametrize(
+        "command_name",
+        [
+            "sprint-start",
+            "sprint-status",
+            "sprint-next",
+            "sprint-complete",
+            "sprint-abort",
+            "sprint-new",
+        ],
+    )
     def test_command_file_exists(self, command_name):
         """Each sprint command file should exist."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -46,14 +46,17 @@ class TestSprintCommandFilesExist:
 class TestSprintCommandFileStructure:
     """Verify command files have correct YAML frontmatter."""
 
-    @pytest.mark.parametrize("command_name", [
-        "sprint-start",
-        "sprint-status",
-        "sprint-next",
-        "sprint-complete",
-        "sprint-abort",
-        "sprint-new",
-    ])
+    @pytest.mark.parametrize(
+        "command_name",
+        [
+            "sprint-start",
+            "sprint-status",
+            "sprint-next",
+            "sprint-complete",
+            "sprint-abort",
+            "sprint-new",
+        ],
+    )
     def test_command_has_frontmatter(self, command_name):
         """Each command file should have YAML frontmatter with description."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -69,13 +72,16 @@ class TestSprintCommandFileStructure:
         frontmatter = content[3:end_marker]
         assert "description:" in frontmatter, f"{command_name} missing description"
 
-    @pytest.mark.parametrize("command_name,expected_tools", [
-        ("sprint-start", ["Read", "Write", "Glob", "Task"]),
-        ("sprint-status", ["Read", "Glob"]),
-        ("sprint-next", ["Read", "Write", "Edit", "Bash"]),
-        ("sprint-complete", ["Read", "Write", "Edit", "Bash"]),
-        ("sprint-abort", ["Read", "Write", "Edit"]),
-    ])
+    @pytest.mark.parametrize(
+        "command_name,expected_tools",
+        [
+            ("sprint-start", ["Read", "Write", "Glob", "Task"]),
+            ("sprint-status", ["Read", "Glob"]),
+            ("sprint-next", ["Read", "Write", "Edit", "Bash"]),
+            ("sprint-complete", ["Read", "Write", "Edit", "Bash"]),
+            ("sprint-abort", ["Read", "Write", "Edit"]),
+        ],
+    )
     def test_command_has_allowed_tools(self, command_name, expected_tools):
         """Each command should declare allowed-tools in frontmatter."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -95,13 +101,16 @@ class TestSprintCommandFileStructure:
 class TestMultiSprintStateFilePattern:
     """Verify commands use sprint-specific state file pattern."""
 
-    @pytest.mark.parametrize("command_name", [
-        "sprint-start",
-        "sprint-status",
-        "sprint-next",
-        "sprint-complete",
-        "sprint-abort",
-    ])
+    @pytest.mark.parametrize(
+        "command_name",
+        [
+            "sprint-start",
+            "sprint-status",
+            "sprint-next",
+            "sprint-complete",
+            "sprint-abort",
+        ],
+    )
     def test_command_uses_sprint_specific_state_file(self, command_name):
         """Commands should reference sprint-{N}-state.json pattern."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -122,13 +131,16 @@ class TestMultiSprintStateFilePattern:
             f"Expected one of: {patterns}"
         )
 
-    @pytest.mark.parametrize("command_name", [
-        "sprint-start",
-        "sprint-status",
-        "sprint-next",
-        "sprint-complete",
-        "sprint-abort",
-    ])
+    @pytest.mark.parametrize(
+        "command_name",
+        [
+            "sprint-start",
+            "sprint-status",
+            "sprint-next",
+            "sprint-complete",
+            "sprint-abort",
+        ],
+    )
     def test_command_does_not_use_single_state_file(self, command_name):
         """Commands should NOT reference the old single state file pattern."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -188,7 +200,9 @@ class TestSprintStateIsolation:
             expected_name = f"sprint-{sprint_num}-state.json"
             # Verify pattern matches
             pattern = r"sprint-\d+-state\.json"
-            assert re.match(pattern, expected_name), f"Bad pattern for sprint {sprint_num}"
+            assert re.match(
+                pattern, expected_name
+            ), f"Bad pattern for sprint {sprint_num}"
 
     def test_glob_pattern_finds_all_sprints(self, tmp_path):
         """Glob pattern should find all active sprint state files."""
@@ -285,7 +299,9 @@ class TestSprintStateSchema:
             "pre_flight_checklist": dict,
         }
 
-    @pytest.mark.skip(reason="Command files are now thin shells - state schema is in Python automation")
+    @pytest.mark.skip(
+        reason="Command files are now thin shells - state schema is in Python automation"
+    )
     def test_state_file_schema_in_start_command(self):
         """sprint-start command should create state with correct schema."""
         # NOTE: As of v3.1.0, command files are thin shells that call Python automation.
@@ -293,7 +309,9 @@ class TestSprintStateSchema:
         # See test_sprint_automation.py for tests of the actual state creation logic.
         pass
 
-    @pytest.mark.skip(reason="Command files are now thin shells - checklist is in Python automation")
+    @pytest.mark.skip(
+        reason="Command files are now thin shells - checklist is in Python automation"
+    )
     def test_pre_flight_checklist_items(self):
         """Pre-flight checklist should have all 9 items."""
         # NOTE: As of v3.1.0, command files are thin shells that call Python automation.
@@ -400,13 +418,16 @@ class TestConcurrentSprintScenarios:
 class TestCommandDocumentation:
     """Test that commands have proper usage documentation."""
 
-    @pytest.mark.parametrize("command_name", [
-        "sprint-start",
-        "sprint-status",
-        "sprint-next",
-        "sprint-complete",
-        "sprint-abort",
-    ])
+    @pytest.mark.parametrize(
+        "command_name",
+        [
+            "sprint-start",
+            "sprint-status",
+            "sprint-next",
+            "sprint-complete",
+            "sprint-abort",
+        ],
+    )
     def test_command_documents_multi_sprint_support(self, command_name):
         """Each command should document multi-sprint support."""
         command_file = CLAUDE_COMMANDS_DIR / f"{command_name}.md"
@@ -422,7 +443,10 @@ class TestCommandDocumentation:
             "$ARGUMENTS",  # Indicates sprint number is parameterized
         ]
 
-        found = any(indicator.lower() in content.lower() for indicator in multi_sprint_indicators)
+        found = any(
+            indicator.lower() in content.lower()
+            for indicator in multi_sprint_indicators
+        )
         assert found, f"{command_name} should document multi-sprint support"
 
     def test_sprint_status_supports_all_argument(self):
