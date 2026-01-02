@@ -313,6 +313,11 @@ def move_to_done(sprint_num: int, dry_run: bool = False) -> Path:
             "completed": datetime.now().strftime("%Y-%m-%d")
         })
 
+        # YAML update succeeded, cleanup backup before directory operations
+        # This prevents .bak files from being moved with directory renames
+        _cleanup_backup(backup)
+        backup = None  # Mark as cleaned up
+
         if is_epic:
             # Epic sprint: rename with --done suffix in place
             # If sprint is in a subdirectory (sprint-NN_name/sprint-NN_name.md),
@@ -348,14 +353,12 @@ def move_to_done(sprint_num: int, dry_run: bool = False) -> Path:
             # Move file
             shutil.move(str(sprint_file), str(new_path))
 
-        # Cleanup backup
-        _cleanup_backup(backup)
-
         return new_path
 
     except Exception as e:
-        # Restore from backup on failure
-        _restore_file(backup)
+        # Restore from backup on failure (only if not already cleaned up)
+        if backup and backup.exists():
+            _restore_file(backup)
         raise FileOperationError(f"Failed to move sprint {sprint_num}: {e}") from e
 
 

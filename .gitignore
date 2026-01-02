@@ -30,3 +30,9 @@ workspace_tickets/
 # Sprint workflow state files
 .claude/sprint-*-state.json
 .claude/product-state.json
+
+# Backup files created by automation
+*.bak
+.venv/
+**/__pycache__/
+*.pyc
