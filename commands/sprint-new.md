@@ -11,22 +11,61 @@ Create a new sprint planning file for Sprint **$ARGUMENTS**.
 
 ### 1. Determine Sprint Number, Title, and Epic
 
+**IMPORTANT**: Sprint numbers are now AUTO-ASSIGNED from registry.json unless explicitly specified.
+
 Parse $ARGUMENTS:
-- If just a number (e.g., "5"), prompt user for title
-- If "5 Feature Name", use "5" as number and "Feature Name" as title
-- If includes "--epic=N", extract epic number N and remove from title
+
+**Option A - Auto-number (RECOMMENDED):**
+- If just a title (e.g., "Photo Upload Feature"), auto-assign next sprint number
+- If includes "--epic=N", link to epic N
+- Example: "Photo Capture --epic=3" → Auto-assigns next number (e.g., Sprint 6), Title "Photo Capture", Epic 3
+
+**Option B - Manual number (backwards compatibility):**
+- If starts with number (e.g., "53 Photo Capture"), use "53" as number
 - Example: "53 Photo Capture --epic=3" → Sprint 53, Title "Photo Capture", Epic 3
+- **Warning**: Manual numbers may conflict with auto-assigned numbers!
+
+**Auto-number workflow:**
+```bash
+# Get next sprint number from automation
+SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py next-sprint-number --dry-run | grep "Next sprint number" | awk '{print $4}')
+echo "Auto-assigned sprint number: $SPRINT_NUM"
+```
 
 Epic is optional - sprints can exist without an epic.
 
-### 2. Check for Existing Sprints
+### 2. Register Sprint in Registry (Auto-number mode)
 
-Use Glob to find existing sprints:
+**If using auto-number mode**, register the sprint using automation:
+
+```bash
+# Extract title and epic from arguments
+TITLE="$TITLE"  # Parsed from arguments
+EPIC="$EPIC"    # Optional, parsed from --epic=N
+
+# Register sprint and get assigned number
+if [ -n "$EPIC" ]; then
+  SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py register-sprint "$TITLE" --epic $EPIC --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
+else
+  SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py register-sprint "$TITLE" --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
+fi
+
+echo "✓ Sprint $SPRINT_NUM registered: $TITLE"
 ```
+
+This automatically:
+- Assigns next available sprint number
+- Increments registry counter
+- Registers sprint in registry.json with metadata
+- Links to epic if specified
+
+**If using manual number mode**, check for conflicts:
+```bash
+# Use Glob to find existing sprints
 docs/sprints/sprint-*.md
-```
 
-Verify the sprint number doesn't already exist.
+# Verify the sprint number doesn't already exist
+```
 
 ### 3. Create Sprint Directory (if needed)
 

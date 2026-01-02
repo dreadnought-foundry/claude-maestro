@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 STATE_FILE = Path(".claude/sprint-state.json")
+SPRINT_LIFECYCLE = Path("scripts/sprint_lifecycle.py")
 
 
 def run_tests() -> tuple[bool, str]:
@@ -62,6 +63,41 @@ def check_no_secrets() -> tuple[bool, str]:
     return True, "No secrets found (filtered)"
 
 
+def check_automation_utilities() -> tuple[bool, str]:
+    """Check that sprint lifecycle automation utilities exist."""
+    if not SPRINT_LIFECYCLE.exists():
+        return False, f"Missing automation utility: {SPRINT_LIFECYCLE}"
+
+    # Check if script is executable
+    if not SPRINT_LIFECYCLE.stat().st_mode & 0o111:
+        return False, f"Automation utility not executable: {SPRINT_LIFECYCLE}"
+
+    # Validate script has required functions
+    try:
+        with open(SPRINT_LIFECYCLE) as f:
+            content = f.read()
+
+        required_functions = [
+            "def move_to_done(",
+            "def update_registry(",
+            "def check_epic_completion(",
+            "def create_git_tag("
+        ]
+
+        missing = []
+        for func in required_functions:
+            if func not in content:
+                missing.append(func.replace("def ", "").replace("(", "()"))
+
+        if missing:
+            return False, f"Missing functions in {SPRINT_LIFECYCLE}: {', '.join(missing)}"
+
+        return True, "Automation utilities ready"
+
+    except Exception as e:
+        return False, f"Error validating automation utilities: {e}"
+
+
 def main():
     if not STATE_FILE.exists():
         print("No active sprint")
@@ -75,6 +111,15 @@ def main():
     print()
 
     failures = []
+
+    # 0. Automation utilities exist
+    print("0. Checking automation utilities...", end=" ")
+    utils_ok, utils_output = check_automation_utilities()
+    if utils_ok:
+        print("PASS")
+    else:
+        print("FAIL")
+        failures.append(("Automation utilities", utils_output))
 
     # 1. Tests passing
     print("1. Checking tests...", end=" ")

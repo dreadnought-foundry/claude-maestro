@@ -51,7 +51,17 @@ This is a **3-layer workflow enforcement system** for consistent sprint executio
 
 For a project to use this workflow, it needs:
 
-1. Sprint planning files in `docs/sprints/sprint-NN_title.md`
+1. Sprint planning files organized by status:
+   ```
+   docs/sprints/
+   ├── 0-backlog/      # Future sprints
+   ├── 1-todo/         # Ready to start
+   ├── 2-in-progress/  # Currently active
+   ├── 3-done/         # Completed
+   ├── 4-blocked/      # Waiting on dependencies
+   ├── 5-abandoned/    # Cancelled/abandoned
+   └── 6-archived/     # Archived completed sprints
+   ```
 2. The state file `.claude/sprint-state.json` (created by `/sprint-start`)
 
 ### Enforcement Rules

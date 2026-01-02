@@ -239,112 +239,95 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    - Set `| **Completed** |` to current date/time
    - Check off all checklist items
 
-5. **Move or rename sprint file based on epic membership**:
+5. **Move or rename sprint file using automation**:
 
-   First, detect if sprint is part of an epic:
+   Use the `sprint_lifecycle.py` utility to handle file movement:
    ```bash
-   # Find the current sprint file
-   SPRINT_FILE=$(find docs/sprints -name "sprint-$ARGUMENTS_*.md" -o -name "sprint-$ARGUMENTS*.md" | grep -v "\-\-" | head -1)
+   # First show what would happen (dry-run)
+   python scripts/sprint_lifecycle.py move-to-done $ARGUMENTS --dry-run
 
-   # Check if it's in an epic folder
-   if echo "$SPRINT_FILE" | grep -q "/epic-"; then
-     IS_IN_EPIC=true
-   else
-     IS_IN_EPIC=false
-   fi
+   # If dry-run looks good, execute the move
+   python scripts/sprint_lifecycle.py move-to-done $ARGUMENTS
    ```
 
-   **If in an epic** (IS_IN_EPIC=true):
-   - Rename with `--done` suffix, keep in epic folder
-   ```bash
-   mv "$SPRINT_FILE" "${SPRINT_FILE%.md}--done.md"
-   ```
-   - **Note**: The epic folder stays in `2-in-progress/` until ALL sprints are complete.
-   - Use `/epic-complete <N>` when all sprints in the epic are done.
+   This automatically:
+   - Detects if sprint is in an epic or standalone
+   - **If in epic**: Renames with `--done` suffix, keeps in epic folder
+   - **If standalone**: Moves to `docs/sprints/3-done/_standalone/` with `--done` suffix
+   - Updates YAML frontmatter: `status: done`, `completed: <date>`
+   - Handles atomic file operations with backup/rollback on failure
 
-   **If standalone** (IS_IN_EPIC=false):
-   - Rename with `--done` suffix and move to `docs/sprints/3-done/_standalone/`
-   ```bash
-   mkdir -p docs/sprints/3-done/_standalone
-   BASENAME=$(basename "$SPRINT_FILE" .md)
-   mv "$SPRINT_FILE" "docs/sprints/3-done/_standalone/${BASENAME}--done.md"
-   ```
+   **Note**: Epic folders stay in `2-in-progress/` until ALL sprints complete.
+   Use `/epic-complete <N>` when all sprints in the epic are done.
 
-5b. **VALIDATE Sprint File Location** (CRITICAL):
+5b. **VALIDATE Sprint File Location**:
 
-   After moving/renaming, verify the file is in the correct location:
-
-   ```bash
-   # Define expected location
-   if [ "$IS_IN_EPIC" = true ]; then
-     EXPECTED_PATH=$(echo "$SPRINT_FILE" | sed 's/\.md$/--done.md/')
-   else
-     EXPECTED_PATH="docs/sprints/3-done/_standalone/${BASENAME}--done.md"
-   fi
-
-   # Verify file exists at expected location
-   if [ ! -f "$EXPECTED_PATH" ]; then
-     echo "ERROR: Sprint file not found at expected location: $EXPECTED_PATH"
-     exit 1
-   fi
-
-   # Verify filename has --done suffix
-   if ! echo "$EXPECTED_PATH" | grep -q '\-\-done\.md$'; then
-     echo "ERROR: Sprint file missing --done suffix"
-     exit 1
-   fi
-
-   # Verify NOT in invalid folders (4-done, 5-done, etc.)
-   if echo "$EXPECTED_PATH" | grep -qE 'docs/sprints/[0-24-9]-done'; then
-     echo "ERROR: Sprint file in invalid folder. Must be in 3-done/"
-     exit 1
-   fi
-
-   # Verify standalone files are in _standalone subfolder
-   if [ "$IS_IN_EPIC" = false ]; then
-     if ! echo "$EXPECTED_PATH" | grep -q '3-done/_standalone/'; then
-       echo "ERROR: Standalone sprint must be in 3-done/_standalone/"
-       exit 1
-     fi
-   fi
-
-   echo "VALIDATED: Sprint file correctly located at $EXPECTED_PATH"
-   ```
-
-   **If validation fails**, report the error and:
-   - Check where the file actually ended up: `find docs/sprints -name "*sprint-$ARGUMENTS*"`
-   - Use `/sprint-recover $ARGUMENTS` to fix the location
-   - DO NOT mark sprint as complete until file is in correct location
+   The automation utility validates file location automatically. If any errors occur:
+   - The utility will rollback changes (restore from backup)
+   - Error message will indicate what failed
+   - Use `/sprint-recover $ARGUMENTS` if needed to fix manual issues
 
    Update state: `pre_flight_checklist.file_location_validated = true/false`
 
-6. **Update `docs/sprints/README.md`**:
-   - Add sprint to completed list with hours tracked
-   - Update statistics if present
+6. **Update sprint registry using automation**:
+
+   Use the `sprint_lifecycle.py` utility to update the registry:
+   ```bash
+   # Calculate hours from start to completion
+   HOURS=<calculated hours>
+
+   # Update registry with completion metadata
+   python scripts/sprint_lifecycle.py update-registry $ARGUMENTS \
+     --status done \
+     --completed $(date +%Y-%m-%d) \
+     --hours $HOURS
+   ```
+
+   This automatically:
+   - Updates `docs/sprints/registry.json` with sprint status
+   - Adds completion metadata (timestamp, hours)
+   - Creates registry file if it doesn't exist
+   - Handles atomic updates with backup/rollback
 
 7. **Update state file** `.claude/sprint-$ARGUMENTS-state.json`:
    - `status` = "complete"
    - `completed_at` = current ISO timestamp
 
-8. **Create Git Tag**:
+8. **Create Git Tag using automation**:
 
-   Create an annotated git tag for the completed sprint:
+   Use the `sprint_lifecycle.py` utility to create and push the tag:
    ```bash
-   # Get sprint title from file
-   SPRINT_TITLE=$(grep -m1 "^title:" "$SPRINT_FILE" | sed 's/title: *//' | tr -d '"')
+   # Get sprint title from YAML frontmatter
+   SPRINT_TITLE=$(grep -m1 "^title:" <sprint-file-path> | sed 's/title: *//' | tr -d '"')
 
-   # Create annotated tag
-   git tag -a "sprint-$ARGUMENTS" -m "Sprint $ARGUMENTS: $SPRINT_TITLE"
+   # Create tag and auto-push to remote
+   python scripts/sprint_lifecycle.py create-tag $ARGUMENTS "$SPRINT_TITLE"
    ```
+
+   This automatically:
+   - Validates git working directory is clean
+   - Creates annotated tag: `sprint-N`
+   - Tag message: `Sprint N: <title>`
+   - Pushes tag to remote origin
+   - Handles errors with clear messages
 
    Tag format: `sprint-N` (e.g., `sprint-42`, `sprint-123`)
 
-   **Note**: Tags are local by default. To share with team:
+9. **Check epic completion status**:
+
+   Use the `sprint_lifecycle.py` utility to check if epic is complete:
    ```bash
-   git push origin sprint-$ARGUMENTS
+   # If sprint is part of an epic, check completion
+   python scripts/sprint_lifecycle.py check-epic <epic-number>
    ```
 
-9. **Report success**:
+   This will:
+   - Detect if all sprints in epic are done/aborted
+   - Display epic completion status
+   - Prompt to run `/epic-complete <N>` if ready
+   - Show remaining sprints if not complete
+
+10. **Report success**:
 
    **For epic sprints**:
    ```
@@ -360,10 +343,9 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
 
    Sprint file renamed to: <filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
-   Git tag created: sprint-$ARGUMENTS
+   Git tag created and pushed: sprint-$ARGUMENTS
 
-   Epic status: <X of Y sprints complete>
-   When all sprints done: /epic-complete <epic-number>
+   Epic status: <epic completion message from check_epic_completion>
    ```
 
    **For standalone sprints**:
@@ -380,7 +362,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
 
    Sprint file moved to: docs/sprints/3-done/_standalone/<filename>--done.md
    State file preserved at .claude/sprint-$ARGUMENTS-state.json
-   Git tag created: sprint-$ARGUMENTS
+   Git tag created and pushed: sprint-$ARGUMENTS
    ```
 
 ---
