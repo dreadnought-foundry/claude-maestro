@@ -39,8 +39,8 @@ from scripts.sprint_lifecycle import (
     # Batch 3: State management
     block_sprint,
     resume_sprint,
-    # advance_step,  # TODO: Not implemented yet
-    # generate_postmortem,  # TODO: Not implemented yet
+    advance_step,
+    generate_postmortem,
 
     # Batch 4: Queries & utilities
     get_sprint_status,
@@ -501,22 +501,175 @@ class TestResumeSprint:
         assert "previous_blocker" in result  # May be "Unknown" if not in state
 
 
-@pytest.mark.skip(reason="advance_step() not yet implemented")
 class TestAdvanceStep:
     """Test advance_step() function."""
 
     def test_advance_step_updates_state(self, temp_project, sprint_in_progress):
         """Should advance to next workflow step."""
-        pass  # TODO: Implement when function is added
+        # Create sprint-steps.json in home directory mock
+        steps_data = {
+            "version": "3.1.0",
+            "step_order": ["1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "3.3", "3.4", "4.1"],
+            "phases": [
+                {
+                    "phase": 1,
+                    "name": "Planning",
+                    "steps": [
+                        {"step": "1.1", "name": "Read Sprint"},
+                        {"step": "1.2", "name": "Design Architecture"},
+                        {"step": "1.3", "name": "Clarify Requirements"},
+                        {"step": "1.4", "name": "Document Plan"}
+                    ]
+                },
+                {
+                    "phase": 2,
+                    "name": "Test-First Implementation",
+                    "steps": [
+                        {"step": "2.1", "name": "Write Tests"},
+                        {"step": "2.2", "name": "Implement Code"},
+                        {"step": "2.3", "name": "Run Tests"},
+                        {"step": "2.4", "name": "Fix Failures"}
+                    ]
+                },
+                {
+                    "phase": 3,
+                    "name": "Validation & Refactoring",
+                    "steps": [
+                        {"step": "3.1", "name": "Verify Migrations"},
+                        {"step": "3.2", "name": "Quality Review"},
+                        {"step": "3.3", "name": "Refactor"},
+                        {"step": "3.4", "name": "Re-test"}
+                    ]
+                },
+                {
+                    "phase": 4,
+                    "name": "Documentation",
+                    "steps": [
+                        {"step": "4.1", "name": "Generate Examples"}
+                    ]
+                }
+            ]
+        }
+
+        # Mock Path.home() to return temp directory with sprint-steps.json
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+            (temp_project / ".claude" / "sprint-steps.json").write_text(json.dumps(steps_data, indent=2))
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                result = advance_step(10, dry_run=False)
+
+        # Verify result
+        assert result["sprint_num"] == 10
+        assert result["previous_step"] == "2.1"
+        assert result["new_step"] == "2.2"
+        assert result["previous_step_name"] == "Write Tests"
+        assert result["new_step_name"] == "Implement Code"
+
+        # Verify state file updated
+        state_path = temp_project / ".claude" / "sprint-10-state.json"
+        with open(state_path) as f:
+            state = json.load(f)
+
+        assert state["current_step"] == "2.2"
+        assert state["current_phase"] == 2
+        assert len(state.get("completed_steps", [])) == 1
+        assert state["completed_steps"][0]["step"] == "2.1"
+
+    def test_advance_step_dry_run(self, temp_project, sprint_in_progress):
+        """Should preview step advancement without changing state."""
+        # Create sprint-steps.json
+        steps_data = {
+            "version": "3.1.0",
+            "step_order": ["1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4"],
+            "phases": [
+                {
+                    "phase": 2,
+                    "name": "Test-First Implementation",
+                    "steps": [
+                        {"step": "2.1", "name": "Write Tests"},
+                        {"step": "2.2", "name": "Implement Code"}
+                    ]
+                }
+            ]
+        }
+
+        with patch('pathlib.Path.home') as mock_home:
+            mock_home.return_value = temp_project
+            (temp_project / ".claude" / "sprint-steps.json").write_text(json.dumps(steps_data, indent=2))
+
+            with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+                result = advance_step(10, dry_run=True)
+
+        # Verify result
+        assert result["dry_run"] is True
+        assert result["new_step"] == "2.2"
+
+        # Verify state file NOT changed
+        state_path = temp_project / ".claude" / "sprint-10-state.json"
+        with open(state_path) as f:
+            state = json.load(f)
+
+        assert state["current_step"] == "2.1"  # Still at original step
+        assert "completed_steps" not in state or len(state.get("completed_steps", [])) == 0
 
 
-@pytest.mark.skip(reason="generate_postmortem() not yet implemented")
 class TestGeneratePostmortem:
     """Test generate_postmortem() function."""
 
-    def test_generate_postmortem_adds_section(self, temp_project, sprint_in_progress):
-        """Should add postmortem section if missing."""
-        pass  # TODO: Implement when function is added
+    def test_generate_postmortem_creates_file(self, temp_project, sprint_in_progress):
+        """Should create postmortem file and link from sprint."""
+        # Add completed timestamp to state
+        state_path = temp_project / ".claude" / "sprint-10-state.json"
+        with open(state_path) as f:
+            state = json.load(f)
+        state["completed_at"] = "2025-12-30T12:00:00Z"
+        state["completed_steps"] = [
+            {"step": "1.1", "completed_at": "2025-12-30T10:15:00Z"},
+            {"step": "1.2", "completed_at": "2025-12-30T10:30:00Z"}
+        ]
+        with open(state_path, 'w') as f:
+            json.dump(state, f, indent=2)
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            result = generate_postmortem(10, dry_run=False)
+
+        # Verify result
+        assert result["sprint_num"] == 10
+        assert "postmortem_file" in result
+        assert "metrics" in result
+
+        # Verify postmortem file created
+        postmortem_file = Path(result["postmortem_file"])
+        assert postmortem_file.exists()
+        content = postmortem_file.read_text()
+        assert "Sprint 10 Postmortem" in content
+        assert "Active Sprint" in content
+        assert "## Metrics" in content
+        assert "## What Went Well" in content
+        assert "## What Could Improve" in content
+
+        # Verify metrics calculated
+        assert result["metrics"]["duration_hours"] == 2.0
+        assert result["metrics"]["completed_steps"] == 2
+
+        # Verify sprint file has link
+        sprint_file = temp_project / "docs" / "sprints" / "2-in-progress" / "sprint-10_active-sprint.md"
+        sprint_content = sprint_file.read_text()
+        assert "[Sprint 10 Postmortem](./sprint-10_postmortem.md)" in sprint_content
+
+    def test_generate_postmortem_dry_run(self, temp_project, sprint_in_progress):
+        """Should preview postmortem generation without creating files."""
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project):
+            result = generate_postmortem(10, dry_run=True)
+
+        # Verify result
+        assert result["dry_run"] is True
+        assert result["sprint_num"] == 10
+
+        # Verify postmortem file NOT created
+        postmortem_file = Path(result["postmortem_file"])
+        assert not postmortem_file.exists()
 
 
 # ============================================================================

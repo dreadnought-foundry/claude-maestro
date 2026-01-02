@@ -1727,6 +1727,319 @@ def resume_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     return summary
 
 
+def advance_step(sprint_num: int, dry_run: bool = False) -> dict:
+    """
+    Advance sprint to next workflow step.
+
+    Reads current step from state, finds next step in workflow definition,
+    and updates state file. Validates that current step is completed.
+
+    Args:
+        sprint_num: Sprint number to advance
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with summary of step advancement
+
+    Raises:
+        FileOperationError: If sprint or state file not found
+        ValidationError: If current step is not complete
+
+    Example:
+        >>> advance_step(4, dry_run=True)
+        >>> # Preview: Sprint 4: 1.1 Planning → 1.2 Design
+    """
+    project_root = find_project_root()
+
+    # Read state file
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if not state_file.exists():
+        raise FileOperationError(
+            f"No state file for sprint {sprint_num}. Sprint may not be started."
+        )
+
+    with open(state_file) as f:
+        state = json.load(f)
+
+    current_step = state.get("current_step")
+    if not current_step:
+        raise ValidationError("State file missing current_step")
+
+    # Load workflow steps definition
+    steps_file = Path.home() / ".claude" / "sprint-steps.json"
+    if not steps_file.exists():
+        raise FileOperationError(
+            f"Sprint steps definition not found at {steps_file}"
+        )
+
+    with open(steps_file) as f:
+        steps_def = json.load(f)
+
+    step_order = steps_def.get("step_order", [])
+    if not step_order:
+        raise ValidationError("sprint-steps.json missing step_order")
+
+    # Find current step index
+    try:
+        current_idx = step_order.index(current_step)
+    except ValueError:
+        raise ValidationError(f"Current step '{current_step}' not found in workflow")
+
+    # Get next step
+    if current_idx >= len(step_order) - 1:
+        raise ValidationError(
+            f"Already at final step ({current_step}). Use /sprint-complete to finish."
+        )
+
+    next_step = step_order[current_idx + 1]
+
+    # Find step details
+    current_step_name = None
+    next_step_name = None
+    for phase in steps_def.get("phases", []):
+        for step_info in phase.get("steps", []):
+            if step_info["step"] == current_step:
+                current_step_name = step_info["name"]
+            if step_info["step"] == next_step:
+                next_step_name = step_info["name"]
+
+    summary = {
+        "sprint_num": sprint_num,
+        "previous_step": current_step,
+        "previous_step_name": current_step_name,
+        "new_step": next_step,
+        "new_step_name": next_step_name,
+        "dry_run": dry_run,
+    }
+
+    print(f"\n{'='*60}")
+    print(f"ADVANCE SPRINT {sprint_num} TO NEXT STEP")
+    print(f"{'='*60}")
+    print(f"Current:  {current_step} - {current_step_name}")
+    print(f"Next:     {next_step} - {next_step_name}")
+
+    if dry_run:
+        print(f"\n[DRY RUN] Would update state file:")
+        print(f"  - Mark {current_step} as completed")
+        print(f"  - Advance to {next_step}")
+        print(f"{'='*60}")
+        return summary
+
+    # Mark current step completed
+    completed_steps = state.get("completed_steps", [])
+    completed_steps.append({
+        "step": current_step,
+        "completed_at": datetime.now().isoformat()
+    })
+
+    # Update state
+    state["current_step"] = next_step
+    state["completed_steps"] = completed_steps
+
+    # Parse current step to update phase (e.g., "2.3" → phase 2)
+    try:
+        phase_num = int(next_step.split('.')[0])
+        state["current_phase"] = phase_num
+    except (ValueError, IndexError):
+        pass  # Keep existing phase if parsing fails
+
+    # Write updated state
+    with open(state_file, 'w') as f:
+        json.dump(state, f, indent=2)
+
+    print(f"\n✓ Advanced to step {next_step}")
+    print(f"  State file updated: {state_file.name}")
+    print(f"{'='*60}")
+
+    return summary
+
+
+def generate_postmortem(sprint_num: int, dry_run: bool = False) -> dict:
+    """
+    Generate postmortem analysis as a separate file linked from sprint.
+
+    Creates sprint-{N}_postmortem.md with metrics, learnings, and analysis.
+    Adds link to postmortem from the sprint file.
+
+    Args:
+        sprint_num: Sprint number to generate postmortem for
+        dry_run: If True, preview without creating files
+
+    Returns:
+        Dict with summary of postmortem generation
+
+    Raises:
+        FileOperationError: If sprint file not found
+        ValidationError: If sprint is not complete
+
+    Example:
+        >>> generate_postmortem(4)
+        >>> # Creates: sprint-4_postmortem.md
+        >>> # Links from: sprint-4_feature-name--done.md
+    """
+    project_root = find_project_root()
+
+    # Find sprint file
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+    if not sprint_file:
+        raise FileOperationError(f"Sprint {sprint_num} file not found")
+
+    # Read sprint YAML frontmatter
+    with open(sprint_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Sprint {sprint_num} has no YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    sprint_title = title_match.group(1).strip().strip('"') if title_match else f"Sprint {sprint_num}"
+
+    # Read state file if exists
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    metrics = {}
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+
+        # Calculate duration
+        started = state.get("started_at")
+        completed = state.get("completed_at")
+        if started and completed:
+            from datetime import datetime
+            start_dt = datetime.fromisoformat(started.replace('Z', '+00:00'))
+            complete_dt = datetime.fromisoformat(completed.replace('Z', '+00:00'))
+            duration = complete_dt - start_dt
+            metrics["duration_hours"] = round(duration.total_seconds() / 3600, 1)
+            metrics["started_at"] = started
+            metrics["completed_at"] = completed
+
+        metrics["completed_steps"] = len(state.get("completed_steps", []))
+
+    # Create postmortem file in same directory as sprint
+    postmortem_file = sprint_file.parent / f"sprint-{sprint_num}_postmortem.md"
+
+    # Generate postmortem content
+    postmortem_content = f"""# Sprint {sprint_num} Postmortem: {sprint_title}
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+| Sprint Number | {sprint_num} |
+| Started | {metrics.get('started_at', 'N/A')} |
+| Completed | {metrics.get('completed_at', 'N/A')} |
+| Duration | {metrics.get('duration_hours', 'N/A')} hours |
+| Steps Completed | {metrics.get('completed_steps', 'N/A')} |
+| Files Changed | TODO: Run `git diff --stat` |
+| Tests Added | TODO: Count test functions |
+| Coverage Delta | TODO: Compare coverage |
+
+## What Went Well
+
+<!-- What worked well during this sprint? -->
+
+- TODO: Add positives
+
+## What Could Improve
+
+<!-- What could be done better next time? -->
+
+- TODO: Add improvements
+
+## Blockers Encountered
+
+<!-- Were there any blockers or unexpected challenges? -->
+
+- TODO: Document blockers
+
+## Technical Insights
+
+<!-- What did we learn technically? -->
+
+- TODO: Add technical learnings
+
+## Process Insights
+
+<!-- What did we learn about our process? -->
+
+- TODO: Add process learnings
+
+## Patterns Discovered
+
+<!-- Any reusable code patterns worth documenting? -->
+
+```
+TODO: Add code patterns
+```
+
+## Action Items for Next Sprint
+
+- [ ] TODO: Add follow-up tasks
+
+## Notes
+
+<!-- Any other observations or context -->
+
+TODO: Add additional notes
+"""
+
+    summary = {
+        "sprint_num": sprint_num,
+        "postmortem_file": str(postmortem_file),
+        "sprint_file": str(sprint_file),
+        "dry_run": dry_run,
+        "metrics": metrics,
+    }
+
+    print(f"\n{'='*60}")
+    print(f"GENERATE POSTMORTEM FOR SPRINT {sprint_num}")
+    print(f"{'='*60}")
+    print(f"Sprint: {sprint_title}")
+    if metrics:
+        print(f"Duration: {metrics.get('duration_hours', 'N/A')} hours")
+        print(f"Steps: {metrics.get('completed_steps', 'N/A')}")
+    print(f"Postmortem file: {postmortem_file.name}")
+
+    if dry_run:
+        print(f"\n[DRY RUN] Would create:")
+        print(f"  - {postmortem_file}")
+        print(f"  - Add link in {sprint_file.name}")
+        print(f"{'='*60}")
+        return summary
+
+    # Write postmortem file
+    with open(postmortem_file, 'w') as f:
+        f.write(postmortem_content)
+
+    # Add link to postmortem in sprint file if not already present
+    postmortem_link = f"[Sprint {sprint_num} Postmortem](./sprint-{sprint_num}_postmortem.md)"
+    if postmortem_link not in content:
+        # Add link after YAML frontmatter or at end
+        if "## Postmortem" in content:
+            # Replace existing postmortem section with link
+            content = re.sub(
+                r'## Postmortem\s*\n.*?(?=\n##|\Z)',
+                f"## Postmortem\n\nSee {postmortem_link}\n\n",
+                content,
+                flags=re.DOTALL
+            )
+        else:
+            # Append postmortem section
+            content += f"\n\n## Postmortem\n\nSee {postmortem_link}\n"
+
+        with open(sprint_file, 'w') as f:
+            f.write(content)
+
+    print(f"\n✓ Created postmortem file: {postmortem_file.name}")
+    print(f"✓ Added link to sprint file")
+    print(f"{'='*60}")
+
+    return summary
+
+
 def get_sprint_status(sprint_num: int) -> dict:
     """
     Get current sprint status and progress.
@@ -2774,6 +3087,18 @@ def main():
     create_project_parser.add_argument("target_path", nargs="?", help="Target directory (default: current)")
     create_project_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
 
+    # === STATE MANAGEMENT COMMANDS ===
+
+    # advance-step command
+    advance_step_parser = subparsers.add_parser("advance-step", help="Advance sprint to next workflow step")
+    advance_step_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    advance_step_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
+    # generate-postmortem command
+    postmortem_parser = subparsers.add_parser("generate-postmortem", help="Generate postmortem analysis file")
+    postmortem_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    postmortem_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -2944,6 +3269,18 @@ def main():
             target = getattr(args, 'target_path', None)
             result = create_project(target_path=target, dry_run=args.dry_run)
             # Output is handled by create_project() function
+
+        # === STATE MANAGEMENT COMMAND HANDLERS ===
+
+        elif args.command == "advance-step":
+            result = advance_step(args.sprint_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Sprint {result['sprint_num']} advanced to step {result['new_step']}")
+
+        elif args.command == "generate-postmortem":
+            result = generate_postmortem(args.sprint_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Created postmortem: {result['postmortem_file']}")
 
     except SprintLifecycleError as e:
         print(f"Error: {e}", file=sys.stderr)

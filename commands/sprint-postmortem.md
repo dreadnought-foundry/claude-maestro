@@ -1,133 +1,101 @@
 ---
 description: "Run postmortem analysis after sprint completion"
-allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
+allowed-tools: [Bash]
 ---
 
-# Sprint Postmortem for Sprint $ARGUMENTS
+# Generate Sprint Postmortem
 
-You are running a postmortem for Sprint **$ARGUMENTS**. This captures learnings and improvements.
+Run the generate-postmortem automation command:
 
-## Step 1: Locate Sprint File
-
-Find the sprint file (should be in 4-done/ after completion):
-```
-docs/sprints/4-done/**/sprint-$ARGUMENTS*.md
+```bash
+python3 scripts/sprint_lifecycle.py generate-postmortem $ARGUMENTS
 ```
 
-If not in 4-done/, check 2-in-progress/ and warn user sprint may not be complete.
+This command creates a **separate postmortem file** linked from the sprint file.
 
-## Step 2: Gather Metrics
+**Usage:**
+```
+/sprint-postmortem <sprint-number>
+```
 
-1. **Read the sprint state file** (if exists):
-   ```
-   .claude/sprint-$ARGUMENTS-state.json
-   ```
+**Examples:**
+```
+/sprint-postmortem 2            # Generate postmortem for sprint 2
+/sprint-postmortem 5 --dry-run  # Preview postmortem generation
+```
 
-2. **Calculate metrics**:
-   - Duration: completed_at - started_at
-   - Files changed: `git diff --stat <commit_before>..<commit_after>`
-   - Tests added: count test functions in tests/test_sprint{N}_*.py
+**What It Creates:**
 
-3. **Get coverage delta** (if available):
-   - Compare coverage before/after sprint
+1. **Postmortem File**: `sprint-{N}_postmortem.md` in same directory as sprint file
+2. **Link in Sprint**: Adds/updates "## Postmortem" section with link
 
-## Step 3: Summarize Agent Work
+**Postmortem Template:**
 
-Review the state file's `completed_steps` to summarize:
-- What each agent accomplished
-- Files each agent created/modified
-- Any blockers encountered
+The generated file includes:
 
-## Step 4: Identify Learnings
+```markdown
+# Sprint N Postmortem: {title}
 
-Ask these questions:
+## Metrics
+- Started / Completed timestamps
+- Duration in hours
+- Steps completed
+- Files changed (TODO: fill in with git diff)
+- Tests added (TODO: count)
+- Coverage delta (TODO: compare)
 
-### What Went Well?
-- Did the team strategy work effectively?
-- Were file ownership boundaries respected?
-- Did skills run correctly?
+## What Went Well
+<!-- TODO: Add positives -->
 
-### What Could Improve?
-- Were there integration conflicts?
-- Did any agent get blocked waiting for another?
-- Were there unexpected dependencies?
+## What Could Improve
+<!-- TODO: Add improvements -->
 
-### Patterns Discovered
-- Any reusable code patterns that emerged?
-- Common error handling approaches?
-- Useful test fixtures created?
+## Blockers Encountered
+<!-- TODO: Document blockers -->
 
-### Technical Insights
-- Performance considerations learned?
-- API design patterns that worked well?
-- Database schema decisions that helped/hurt?
+## Technical Insights
+<!-- TODO: Add learnings -->
 
-## Step 5: Update Sprint File
+## Process Insights
+<!-- TODO: Add process learnings -->
 
-Add/update the Postmortem section in the sprint file with:
+## Patterns Discovered
+<!-- TODO: Add code patterns -->
+
+## Action Items for Next Sprint
+- [ ] TODO: Add follow-up tasks
+
+## Notes
+<!-- TODO: Additional observations -->
+```
+
+**Metrics Calculated:**
+
+- **Duration**: Calculated from state file timestamps (started_at → completed_at)
+- **Steps**: Count of completed_steps in state file
+- **Files/Tests/Coverage**: Template placeholders for manual completion
+
+**Sprint File Updates:**
+
+Adds or replaces the Postmortem section:
 
 ```markdown
 ## Postmortem
 
-### Summary
-
-| Metric | Value |
-|--------|-------|
-| Started | {from state file} |
-| Completed | {from state file} |
-| Duration | {calculated} |
-| Tests Added | {count} |
-| Coverage Delta | {if available} |
-| Files Changed | {from git} |
-
-### Agent Work Summary
-
-{Table of agent contributions}
-
-### What Went Well
-
-- {List positives}
-
-### What Could Improve
-
-- {List improvements}
-
-### Patterns Discovered
-
-{Code patterns worth reusing}
-
-### Learnings for Future Sprints
-
-1. **Technical**: {insight}
-2. **Process**: {improvement}
-3. **Integration**: {lesson}
-
-### Action Items
-
-- [ ] {Follow-up tasks}
+See [Sprint N Postmortem](./sprint-{N}_postmortem.md)
 ```
 
-## Step 6: Update Epic (if applicable)
+**When to Run:**
 
-If the sprint is part of an epic, update the epic's `_epic.md` with:
-- Sprint completion summary (one line)
-- Key learnings that apply to other sprints in the epic
+- After sprint is complete and moved to done/
+- Before or after final commit
+- Can be run multiple times (updates existing postmortem file)
 
-## Step 7: Extract Patterns
+**Next Steps After Generation:**
 
-If any significant patterns were discovered:
-1. Create a pattern file in `docs/patterns/{pattern-name}.md`
-2. Document the pattern with examples
-3. Reference it from the sprint postmortem
-
-## Step 8: Report
-
-Output to user:
-1. Summary of metrics
-2. Key learnings
-3. Action items identified
-4. Recommendations for next sprint
-
----
-
-**Note**: Postmortem is part of continuous improvement. Be honest about what didn't work - that's how we get better.
+1. Review the postmortem file
+2. Fill in TODO sections with actual analysis
+3. Run `git diff --stat` for file change metrics
+4. Count test functions added
+5. Compare coverage reports if available
+6. Document learnings and action items
