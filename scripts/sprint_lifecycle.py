@@ -861,6 +861,170 @@ def create_git_tag(sprint_num: int, title: str, dry_run: bool = False, auto_push
         ) from e
 
 
+def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
+    """
+    Complete a sprint with full automation: pre-flight checks, file movement,
+    registry update, git commit, and tag creation.
+
+    Args:
+        sprint_num: Sprint number to complete
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with completion summary
+
+    Raises:
+        FileOperationError: If sprint file not found or operations fail
+        ValidationError: If pre-flight checks fail
+        GitError: If git operations fail
+
+    Example:
+        >>> summary = complete_sprint(2)
+        >>> print(summary['status'])  # 'completed'
+    """
+    project_root = find_project_root()
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+
+    if not sprint_file:
+        raise FileOperationError(
+            f"Sprint {sprint_num} not found. Use /sprint-start {sprint_num} first."
+        )
+
+    # 1. Verify postmortem exists
+    with open(sprint_file) as f:
+        content = f.read()
+        if "## Postmortem" not in content:
+            raise ValidationError(
+                f"Sprint {sprint_num} missing postmortem section.\n"
+                f"Run: /sprint-postmortem {sprint_num} first"
+            )
+
+    # 2. Read YAML frontmatter for metadata
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Sprint {sprint_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    started_match = re.search(r'^started:\s*(.+)$', yaml_content, re.MULTILINE)
+
+    if not title_match:
+        raise ValidationError(f"Sprint {sprint_num} missing title in YAML")
+    if not started_match:
+        raise ValidationError(f"Sprint {sprint_num} missing started timestamp")
+
+    title = title_match.group(1).strip().strip('"')
+    started_str = started_match.group(1).strip()
+
+    # 3. Calculate hours
+    from datetime import datetime
+    started = datetime.fromisoformat(started_str.replace('Z', '+00:00'))
+    completed = datetime.now().astimezone()
+    hours = round((completed - started).total_seconds() / 3600, 1)
+
+    if dry_run:
+        print(f"[DRY RUN] Would complete sprint {sprint_num}:")
+        print(f"  Title: {title}")
+        print(f"  Hours: {hours}")
+        print(f"  1. Move file with --done suffix")
+        print(f"  2. Update registry (status=done, hours={hours})")
+        print(f"  3. Commit changes")
+        print(f"  4. Create and push git tag: sprint-{sprint_num}")
+        print(f"  5. Check epic completion")
+        return {"status": "dry-run", "sprint_num": sprint_num, "hours": hours}
+
+    # 4. Move sprint file to done
+    print(f"→ Moving sprint {sprint_num} to done...")
+    new_path = move_to_done(sprint_num, dry_run=False)
+    print(f"✓ Moved to: {new_path}")
+
+    # 5. Update registry
+    print(f"→ Updating registry...")
+    update_registry(
+        sprint_num,
+        status="done",
+        dry_run=False,
+        completed=completed.strftime("%Y-%m-%d"),
+        hours=hours
+    )
+    print(f"✓ Registry updated")
+
+    # 6. Commit changes
+    print(f"→ Committing changes...")
+    try:
+        commit_msg = (
+            f"feat(sprint-{sprint_num}): complete sprint - {title}\n\n"
+            f"- Duration: {hours} hours\n"
+            f"- Marked with --done suffix\n"
+            f"- Updated registry\n\n"
+            f"🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n"
+            f"Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+        )
+        subprocess.run(
+            ["git", "add", "-A"],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", commit_msg],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        print(f"✓ Changes committed")
+    except subprocess.CalledProcessError as e:
+        raise GitError(f"Failed to commit changes: {e.stderr}") from e
+
+    # 7. Create and push git tag
+    print(f"→ Creating git tag...")
+    create_git_tag(sprint_num, title, dry_run=False, auto_push=True)
+
+    # 8. Check epic completion
+    is_epic, epic_num = _is_epic_sprint(new_path)
+    if is_epic and epic_num:
+        print(f"→ Checking epic {epic_num} completion...")
+        is_complete, message = check_epic_completion(epic_num)
+        print(message)
+        if is_complete:
+            print(f"\n💡 Epic {epic_num} is ready! Run: /epic-complete {epic_num}")
+
+    # 9. Update state file
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+        state["status"] = "complete"
+        state["completed_at"] = completed.isoformat()
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+        print(f"✓ State file updated")
+
+    # 10. Success summary
+    summary = {
+        "status": "completed",
+        "sprint_num": sprint_num,
+        "title": title,
+        "hours": hours,
+        "file_path": str(new_path),
+        "tag": f"sprint-{sprint_num}",
+        "epic": epic_num if is_epic else None
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num}: {title} - COMPLETE ✓")
+    print(f"{'='*60}")
+    print(f"Duration: {hours} hours")
+    print(f"File: {new_path.name}")
+    print(f"Tag: sprint-{sprint_num} (pushed to remote)")
+    if is_epic:
+        print(f"Epic: {epic_num}")
+    print(f"{'='*60}")
+
+    return summary
+
+
 def main():
     """CLI interface for sprint lifecycle utilities."""
     parser = argparse.ArgumentParser(
@@ -896,6 +1060,11 @@ def main():
     register_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without registering")
 
     # === COMPLETION COMMANDS ===
+
+    # complete-sprint command
+    complete_parser = subparsers.add_parser("complete-sprint", help="Complete sprint with full automation")
+    complete_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    complete_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
 
     # move-to-done command
     move_parser = subparsers.add_parser("move-to-done", help="Move sprint to done status")
@@ -974,6 +1143,9 @@ def main():
                 print(f"  Planned sprints: {args.sprint_count}")
 
         # === COMPLETION COMMAND HANDLERS ===
+
+        elif args.command == "complete-sprint":
+            complete_sprint(args.sprint_num, dry_run=args.dry_run)
 
         elif args.command == "move-to-done":
             new_path = move_to_done(args.sprint_num, dry_run=args.dry_run)
