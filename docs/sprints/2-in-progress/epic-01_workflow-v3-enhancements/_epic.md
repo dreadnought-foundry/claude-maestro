@@ -26,10 +26,11 @@ The goal is to make the workflow system self-documenting, automated, and data-dr
 | Sprint | Title | Status |
 |--------|-------|--------|
 | 1 | Discoverability Dashboard | planned |
-| 2 | Automated Lifecycle Management | planned |
+| 2 | Automated Lifecycle Management | done |
 | 3 | Interface Contract Validation | planned |
 | 4 | Type-Aware Quality Gates | planned |
 | 5 | Analytics & Insights | planned |
+| 7 | Modular Automation Architecture | planned |
 
 ## Dependencies & Parallelization
 

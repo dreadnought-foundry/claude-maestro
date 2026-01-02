@@ -353,9 +353,8 @@ Based on Plan agent analysis Priority 2 from vericorr workflow review.
 
 ## Postmortem
 
-### Summary
+See [Sprint 2 Postmortem](./sprint-2_postmortem.md)
 
-Implemented complete sprint lifecycle automation system with auto-numbering, atomic file operations, and full integration testing.
 
 ### Duration & Metrics
 

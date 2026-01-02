@@ -26,3 +26,7 @@ sprint-*-state.json
 session_tickets/
 terminal_tickets/
 workspace_tickets/
+
+# Sprint workflow state files
+.claude/sprint-*-state.json
+.claude/product-state.json

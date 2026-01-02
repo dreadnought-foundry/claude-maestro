@@ -1,111 +1,24 @@
 {
-  "version": "1.0",
-  "generated": "2025-12-30T16:34:00Z",
-  "nextSprintNumber": 7,
-  "nextEpicNumber": 2,
+  "counters": {
+    "next_sprint": 1,
+    "next_epic": 1
+  },
   "sprints": {
-    "1": {
-      "title": "Discoverability Dashboard",
-      "status": "planning",
-      "epic": 1,
-      "created": "2025-12-30",
-      "started": null,
-      "completed": null,
-      "hours": null,
-      "estimatedHours": 2.5,
-      "workflowVersion": "3.0",
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-01_discoverability-dashboard/sprint-01_discoverability-dashboard.md"
-    },
     "2": {
-      "title": "Automated Lifecycle Management",
-      "status": "done",
-      "epic": 1,
-      "created": "2025-12-30",
-      "started": null,
-      "completed": "2026-01-01",
-      "hours": 56.1,
-      "estimatedHours": 5,
-      "workflowVersion": "3.0",
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-02_automated-lifecycle-management/sprint-02_automated-lifecycle-management.md"
-    },
-    "3": {
-      "title": "Interface Contract Validation",
-      "status": "todo",
-      "epic": 1,
-      "created": "2025-12-30",
-      "started": null,
-      "completed": null,
-      "hours": null,
-      "estimatedHours": 7,
-      "workflowVersion": "3.0",
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-03_interface-contract-validation/sprint-03_interface-contract-validation.md"
-    },
-    "4": {
-      "title": "Type-Aware Quality Gates",
-      "status": "todo",
-      "epic": 1,
-      "created": "2025-12-30",
-      "started": null,
-      "completed": null,
-      "hours": null,
-      "estimatedHours": 3.5,
-      "workflowVersion": "3.0",
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-04_type-aware-quality-gates/sprint-04_type-aware-quality-gates.md"
-    },
-    "5": {
-      "title": "Analytics & Insights",
-      "status": "todo",
-      "epic": 1,
-      "created": "2025-12-30",
-      "started": null,
-      "completed": null,
-      "hours": null,
-      "estimatedHours": 6,
-      "workflowVersion": "3.0",
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/sprint-05_analytics-insights/sprint-05_analytics-insights.md"
-    },
-    "6": {
-      "title": "Test Feature for Automation Demo",
+      "title": "Modular Automation Architecture",
       "status": "planning",
       "epic": 1,
       "created": "2026-01-01",
       "started": null,
       "completed": null,
-      "hours": null,
-      "estimatedHours": 3.0
+      "hours": null
+    },
+    "3": {
+      "status": "done",
+      "completed": "2026-01-01",
+      "hours": 8.5
     }
   },
-  "epics": {
-    "1": {
-      "title": "Workflow v3.0 Enhancements",
-      "status": "planning",
-      "created": "2025-12-30",
-      "started": null,
-      "completed": null,
-      "totalSprints": 5,
-      "completedSprints": 1,
-      "estimatedHours": 24,
-      "sprintBreakdown": {
-        "sprint_1": 2.5,
-        "sprint_2": 5.0,
-        "sprint_3": 7.0,
-        "sprint_4": 3.5,
-        "sprint_5": 6.0
-      },
-      "parallelizationPlan": {
-        "week1": [
-          "sprint_1",
-          "sprint_2"
-        ],
-        "week2": [
-          "sprint_3",
-          "sprint_4"
-        ],
-        "week3": [
-          "sprint_5"
-        ]
-      },
-      "file": "docs/sprints/1-todo/epic-01_workflow-v3-enhancements/_epic.md"
-    }
-  }
+  "epics": {},
+  "nextSprintNumber": 3
 }
