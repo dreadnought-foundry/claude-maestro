@@ -1133,6 +1133,347 @@ def abort_sprint(sprint_num: int, reason: str, dry_run: bool = False) -> dict:
     return summary
 
 
+def start_epic(epic_num: int, dry_run: bool = False) -> dict:
+    """
+    Start an epic: move from backlog/todo to in-progress, update YAML.
+
+    Args:
+        epic_num: Epic number to start
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with start summary
+
+    Raises:
+        FileOperationError: If epic folder not found
+        ValidationError: If epic already started
+
+    Example:
+        >>> summary = start_epic(3)
+        >>> print(summary['status'])  # 'started'
+    """
+    project_root = find_project_root()
+
+    # Find epic in backlog or todo
+    epic_folder = None
+    epic_num_str = f"{epic_num:02d}"
+
+    for folder in ["0-backlog", "1-todo"]:
+        search_path = project_root / "docs" / "sprints" / folder
+        if search_path.exists():
+            found = list(search_path.glob(f"epic-{epic_num_str}_*"))
+            if found and found[0].is_dir():
+                epic_folder = found[0]
+                break
+
+    if not epic_folder:
+        raise FileOperationError(
+            f"Epic {epic_num} not found in backlog or todo folders"
+        )
+
+    # Find _epic.md file
+    epic_file = epic_folder / "_epic.md"
+    if not epic_file.exists():
+        raise FileOperationError(
+            f"Epic {epic_num} missing _epic.md file"
+        )
+
+    # Read title from YAML
+    with open(epic_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Epic {epic_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
+
+    # Count sprints in epic
+    sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+    sprint_count = len(sprint_files)
+
+    if dry_run:
+        print(f"[DRY RUN] Would start epic {epic_num}:")
+        print(f"  Title: {title}")
+        print(f"  Sprints: {sprint_count}")
+        print(f"  1. Move to 2-in-progress/")
+        print(f"  2. Update YAML (status=in-progress, started=<now>)")
+        return {"status": "dry-run", "epic_num": epic_num}
+
+    # Move to in-progress
+    in_progress_dir = project_root / "docs" / "sprints" / "2-in-progress"
+    in_progress_dir.mkdir(parents=True, exist_ok=True)
+
+    new_epic_folder = in_progress_dir / epic_folder.name
+    epic_folder.rename(new_epic_folder)
+
+    # Update YAML frontmatter
+    epic_file = new_epic_folder / "_epic.md"
+    started_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _update_yaml_frontmatter(epic_file, {
+        "status": "in-progress",
+        "started": started_time
+    })
+
+    summary = {
+        "epic_num": epic_num,
+        "title": title,
+        "status": "started",
+        "sprint_count": sprint_count,
+        "new_path": str(new_epic_folder)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Epic {epic_num}: {title} - STARTED")
+    print(f"{'='*60}")
+    print(f"Location: {new_epic_folder}")
+    print(f"Sprints: {sprint_count}")
+    print(f"{'='*60}")
+
+    return summary
+
+
+def complete_epic(epic_num: int, dry_run: bool = False) -> dict:
+    """
+    Complete an epic: verify all sprints done/aborted, move to done, calculate stats.
+
+    Args:
+        epic_num: Epic number to complete
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with completion summary
+
+    Raises:
+        FileOperationError: If epic folder not found
+        ValidationError: If epic has unfinished sprints
+
+    Example:
+        >>> summary = complete_epic(3)
+        >>> print(summary['total_hours'])  # 42.5
+    """
+    project_root = find_project_root()
+    epic_num_str = f"{epic_num:02d}"
+
+    # Find epic in in-progress
+    in_progress_dir = project_root / "docs" / "sprints" / "2-in-progress"
+    found = list(in_progress_dir.glob(f"epic-{epic_num_str}_*"))
+
+    if not found or not found[0].is_dir():
+        raise FileOperationError(
+            f"Epic {epic_num} not found in in-progress folder"
+        )
+
+    epic_folder = found[0]
+    epic_file = epic_folder / "_epic.md"
+
+    if not epic_file.exists():
+        raise FileOperationError(
+            f"Epic {epic_num} missing _epic.md file"
+        )
+
+    # Read title from YAML
+    with open(epic_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Epic {epic_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
+
+    # Check all sprints are finished
+    sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+    done_sprints = []
+    aborted_sprints = []
+    unfinished_sprints = []
+    blocked_sprints = []
+
+    for sprint_file in sprint_files:
+        name = sprint_file.name
+        if "--done" in name:
+            done_sprints.append(name)
+        elif "--aborted" in name:
+            aborted_sprints.append(name)
+        elif "--blocked" in name:
+            blocked_sprints.append(name)
+        else:
+            unfinished_sprints.append(name)
+
+    if unfinished_sprints or blocked_sprints:
+        error_msg = f"Cannot complete epic {epic_num} - has unfinished sprints:\n"
+        if unfinished_sprints:
+            error_msg += "\nIn Progress/Pending:\n"
+            for sprint in unfinished_sprints:
+                error_msg += f"  - {sprint}\n"
+        if blocked_sprints:
+            error_msg += "\nBlocked:\n"
+            for sprint in blocked_sprints:
+                error_msg += f"  - {sprint}\n"
+        raise ValidationError(error_msg.strip())
+
+    # Calculate total hours
+    total_hours = 0.0
+    for sprint_file in sprint_files:
+        with open(sprint_file) as f:
+            sprint_content = f.read()
+        yaml_match = re.search(r'^---\n(.*?)\n---', sprint_content, re.DOTALL)
+        if yaml_match:
+            hours_match = re.search(r'^hours:\s*([0-9.]+)', yaml_match.group(1), re.MULTILINE)
+            if hours_match:
+                total_hours += float(hours_match.group(1))
+
+    if dry_run:
+        print(f"[DRY RUN] Would complete epic {epic_num}:")
+        print(f"  Title: {title}")
+        print(f"  Done: {len(done_sprints)}")
+        print(f"  Aborted: {len(aborted_sprints)}")
+        print(f"  Total hours: {total_hours:.1f}")
+        print(f"  1. Move to 3-done/")
+        print(f"  2. Update YAML (status=done, completed=<now>, total_hours)")
+        return {"status": "dry-run", "epic_num": epic_num}
+
+    # Move to done
+    done_dir = project_root / "docs" / "sprints" / "3-done"
+    done_dir.mkdir(parents=True, exist_ok=True)
+
+    new_epic_folder = done_dir / epic_folder.name
+    epic_folder.rename(new_epic_folder)
+
+    # Update YAML frontmatter
+    epic_file = new_epic_folder / "_epic.md"
+    completed_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _update_yaml_frontmatter(epic_file, {
+        "status": "done",
+        "completed": completed_time,
+        "total_hours": total_hours
+    })
+
+    summary = {
+        "epic_num": epic_num,
+        "title": title,
+        "status": "done",
+        "done_count": len(done_sprints),
+        "aborted_count": len(aborted_sprints),
+        "total_hours": total_hours,
+        "new_path": str(new_epic_folder)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Epic {epic_num}: {title} - COMPLETE")
+    print(f"{'='*60}")
+    print(f"Location: {new_epic_folder}")
+    print(f"Sprints completed: {len(done_sprints)}")
+    print(f"Sprints aborted: {len(aborted_sprints)}")
+    print(f"Total hours: {total_hours:.1f}")
+    print(f"{'='*60}")
+
+    return summary
+
+
+def archive_epic(epic_num: int, dry_run: bool = False) -> dict:
+    """
+    Archive an epic: move from done to archived, update YAML.
+
+    Args:
+        epic_num: Epic number to archive
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with archive summary
+
+    Raises:
+        FileOperationError: If epic folder not found in done
+        ValidationError: If epic not yet complete
+
+    Example:
+        >>> summary = archive_epic(3)
+        >>> print(summary['status'])  # 'archived'
+    """
+    project_root = find_project_root()
+    epic_num_str = f"{epic_num:02d}"
+
+    # Find epic in done
+    done_dir = project_root / "docs" / "sprints" / "3-done"
+    found = list(done_dir.glob(f"epic-{epic_num_str}_*"))
+
+    if not found or not found[0].is_dir():
+        raise FileOperationError(
+            f"Epic {epic_num} not found in done folder. Complete it first with /epic-complete"
+        )
+
+    epic_folder = found[0]
+    epic_file = epic_folder / "_epic.md"
+
+    if not epic_file.exists():
+        raise FileOperationError(
+            f"Epic {epic_num} missing _epic.md file"
+        )
+
+    # Read title from YAML
+    with open(epic_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Epic {epic_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
+
+    # Count sprint files
+    sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+    file_count = len(sprint_files)
+
+    if dry_run:
+        print(f"[DRY RUN] Would archive epic {epic_num}:")
+        print(f"  Title: {title}")
+        print(f"  Files: {file_count} sprints + 1 epic")
+        print(f"  1. Move to 6-archived/")
+        print(f"  2. Update YAML (status=archived, archived_at=<now>)")
+        return {"status": "dry-run", "epic_num": epic_num}
+
+    # Move to archived
+    archived_dir = project_root / "docs" / "sprints" / "6-archived"
+    archived_dir.mkdir(parents=True, exist_ok=True)
+
+    new_epic_folder = archived_dir / epic_folder.name
+    epic_folder.rename(new_epic_folder)
+
+    # Update YAML frontmatter
+    epic_file = new_epic_folder / "_epic.md"
+    archived_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _update_yaml_frontmatter(epic_file, {
+        "status": "archived",
+        "archived_at": archived_time
+    })
+
+    summary = {
+        "epic_num": epic_num,
+        "title": title,
+        "status": "archived",
+        "file_count": file_count,
+        "new_path": str(new_epic_folder)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Epic {epic_num}: {title} - ARCHIVED")
+    print(f"{'='*60}")
+    print(f"Location: {new_epic_folder}")
+    print(f"Files: {file_count} sprints + 1 epic")
+    print(f"{'='*60}")
+
+    return summary
+
+
 def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     """
     Complete a sprint with full automation: pre-flight checks, file movement,
@@ -1344,6 +1685,21 @@ def main():
     abort_parser.add_argument("reason", help="Reason for aborting")
     abort_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
 
+    # start-epic command
+    start_epic_parser = subparsers.add_parser("start-epic", help="Start an epic (move to in-progress)")
+    start_epic_parser.add_argument("epic_num", type=int, help="Epic number")
+    start_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
+    # complete-epic command
+    complete_epic_parser = subparsers.add_parser("complete-epic", help="Complete an epic (move to done)")
+    complete_epic_parser.add_argument("epic_num", type=int, help="Epic number")
+    complete_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
+    # archive-epic command
+    archive_epic_parser = subparsers.add_parser("archive-epic", help="Archive an epic (move to archived)")
+    archive_epic_parser.add_argument("epic_num", type=int, help="Epic number")
+    archive_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
     # === COMPLETION COMMANDS ===
 
     # complete-sprint command
@@ -1444,6 +1800,29 @@ def main():
                 print(f"  New path: {result['new_path']}")
                 if result.get('hours'):
                     print(f"  Hours worked: {result['hours']:.1f}")
+
+        elif args.command == "start-epic":
+            result = start_epic(args.epic_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Started epic {result['epic_num']}: {result['title']}")
+                print(f"  Moved to: {result['new_path']}")
+                print(f"  Sprints: {result['sprint_count']}")
+
+        elif args.command == "complete-epic":
+            result = complete_epic(args.epic_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Completed epic {result['epic_num']}: {result['title']}")
+                print(f"  Moved to: {result['new_path']}")
+                print(f"  Sprints completed: {result['done_count']}")
+                print(f"  Sprints aborted: {result['aborted_count']}")
+                print(f"  Total hours: {result['total_hours']:.1f}")
+
+        elif args.command == "archive-epic":
+            result = archive_epic(args.epic_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Archived epic {result['epic_num']}: {result['title']}")
+                print(f"  Moved to: {result['new_path']}")
+                print(f"  Files: {result['file_count']} sprints + 1 epic")
 
         # === COMPLETION COMMAND HANDLERS ===
 
