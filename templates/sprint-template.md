@@ -2,7 +2,7 @@
 sprint: {N}
 title: "{TITLE}"
 status: todo
-workflow_version: "2.1"
+workflow_version: "{WORKFLOW_VERSION}"
 epic: {EPIC_NUMBER}
 type: {TYPE}  # backend-only, frontend-only, fullstack, integration, data-layer
 created: {DATE}
@@ -21,7 +21,7 @@ hours: null
 | Title | {TITLE} |
 | Epic | {EPIC_NUMBER} - {EPIC_NAME} |
 | Type | {TYPE} |
-| Workflow | v2.0 |
+| Workflow | v{WORKFLOW_VERSION} |
 | Status | Todo |
 | Created | {DATE} |
 

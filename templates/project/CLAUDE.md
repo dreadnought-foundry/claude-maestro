@@ -1,8 +1,10 @@
 # Project Instructions
 
-## Workflow System v2.1
+## Workflow System
 
 This project uses an **AI-assisted development workflow** with parallel agents, skills, and slash commands.
+
+**Workflow Version**: See `.claude/WORKFLOW_VERSION` for current version.
 
 ### Quick Start
 

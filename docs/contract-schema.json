@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Interface Contract Schema",
+  "description": "Defines the contract format for backend/frontend/test interfaces in fullstack sprints",
+  "type": "object",
+  "required": ["sprint", "type", "backend_interface", "frontend_interface"],
+  "properties": {
+    "sprint": {
+      "type": "integer",
+      "description": "Sprint number this contract applies to"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["fullstack", "backend-only", "frontend-only", "integration", "data-layer"],
+      "description": "Sprint type - contract validation only applies to fullstack sprints"
+    },
+    "backend_interface": {
+      "type": "object",
+      "description": "Backend API interface definition",
+      "properties": {
+        "queries": {
+          "type": "object",
+          "description": "GraphQL queries exposed by backend",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9]*$": {
+              "type": "string",
+              "description": "Query return type specification (e.g., 'returns: [Feature!]!')"
+            }
+          }
+        },
+        "mutations": {
+          "type": "object",
+          "description": "GraphQL mutations exposed by backend",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9]*$": {
+              "type": "string",
+              "description": "Mutation return type specification"
+            }
+          }
+        },
+        "types": {
+          "type": "object",
+          "description": "GraphQL type definitions",
+          "patternProperties": {
+            "^[A-Z][a-zA-Z0-9]*$": {
+              "type": "object",
+              "description": "Type field definitions with GraphQL type notation",
+              "patternProperties": {
+                "^[a-zA-Z][a-zA-Z0-9]*$": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "GraphQL type (e.g., 'String!', '[Int!]!', 'CustomType')"
+                    },
+                    {
+                      "type": "object",
+                      "description": "Nested type definition for complex types",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "GraphQL type notation"
+                        },
+                        "fields": {
+                          "type": "object",
+                          "description": "Nested field definitions"
+                        }
+                      },
+                      "required": ["type"]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "enums": {
+          "type": "object",
+          "description": "GraphQL enum definitions",
+          "patternProperties": {
+            "^[A-Z][a-zA-Z0-9]*$": {
+              "type": "array",
+              "description": "Enum values (MUST be UPPERCASE)",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$",
+                "description": "Enum value in UPPERCASE"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "frontend_interface": {
+      "type": "object",
+      "description": "Frontend component interface definition",
+      "properties": {
+        "hooks": {
+          "type": "array",
+          "description": "React hooks that consume backend data",
+          "items": {
+            "type": "string",
+            "pattern": "^use[A-Z][a-zA-Z0-9]*$",
+            "description": "Hook names must start with 'use' (React convention)"
+          }
+        },
+        "types": {
+          "type": "array",
+          "description": "TypeScript types/interfaces used by frontend",
+          "items": {
+            "type": "string",
+            "description": "Type names must match backend types or enums"
+          }
+        },
+        "components": {
+          "type": "array",
+          "description": "React components that render data",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][a-zA-Z0-9]*$",
+            "description": "Component names (PascalCase)"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "test_interface": {
+      "type": "object",
+      "description": "Test contract specifications (optional)",
+      "properties": {
+        "backend_assertions": {
+          "type": "array",
+          "description": "Required backend test assertions",
+          "items": {
+            "type": "string",
+            "description": "Assertion description"
+          }
+        },
+        "frontend_assertions": {
+          "type": "array",
+          "description": "Required frontend test assertions",
+          "items": {
+            "type": "string",
+            "description": "Assertion description"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

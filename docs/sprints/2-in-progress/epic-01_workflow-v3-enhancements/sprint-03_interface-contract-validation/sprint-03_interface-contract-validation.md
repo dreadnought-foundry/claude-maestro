@@ -188,6 +188,45 @@ Files to create/modify:
 - What happens if GraphQL schema changes after contract defined?
 - Should we validate response shapes or just types?
 
+## Team Strategy
+
+### Sprint Type
+- **Type**: integration
+- **Parallelism**: Yes (2 streams)
+
+### Agent Assignments
+
+| Agent | Role | Files Owned | Skills |
+|-------|------|-------------|--------|
+| product-engineer | Contract Schema & Validation Tool Developer | scripts/validate_interface_contract.py, docs/contract-schema.json, .claude/sprint-steps.json, .claude/hooks/validate_step.py, templates/contract-example.json | None |
+| quality-engineer | Testing, Documentation & Quality Gates | tests/test_interface_contract_validation.py, docs/patterns/interface-contract-format.md, docs/troubleshooting/contract-validation-errors.md, .claude/hooks/sprint_complete_check.py | None |
+
+### File Ownership
+
+- **Product Engineer**: Core validation tool, contract schema, workflow integration (sprint-steps.json, validate_step.py hook), example template
+- **Quality Engineer**: Test suite, pattern documentation, troubleshooting guide, pre-flight checklist updates
+
+### Integration Strategy
+
+1. Hour 0-1: Product-engineer defines contract JSON schema → share with quality-engineer
+2. Hour 1-3: Parallel implementation (validation logic + tests/docs)
+3. Hour 3-4: First integration point (test execution, bug fixes)
+4. Hour 4-5: Phase 1.5 workflow integration
+5. Hour 5-6: Final validation and polish
+
+### TDD Approach
+
+**Level**: flexible (DEFAULT)
+
+**Rationale**: Standard validation feature with straightforward rules (GraphQL matching, enum casing, type checking). 75% coverage target. Not complex business logic requiring strict TDD.
+
+### Clarifications
+
+- **Nested types**: Support nested type definitions (e.g., Feature.metadata: [MetadataField!]!)
+- **Validation gate**: Mandatory hard gate (no override flag)
+- **Schema changes**: Validate once at Phase 1.5 only
+- **Validation depth**: Full response shape validation (deep nested structure checking)
+
 ## Notes
 
 **Priority**: High (eliminates major source of bugs)

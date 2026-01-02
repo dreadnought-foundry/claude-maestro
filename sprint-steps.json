@@ -1,6 +1,6 @@
 {
-  "version": "2.1",
-  "description": "Optimized sprint workflow with staged parallelism and flexible TDD",
+  "version": "3.1.0",
+  "description": "Sprint workflow step definitions - version should match WORKFLOW_VERSION file",
   "philosophy": {
     "parallelism": "staged",
     "tdd": "flexible",

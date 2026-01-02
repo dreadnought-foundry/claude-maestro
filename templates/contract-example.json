@@ -1,0 +1,54 @@
+{
+  "sprint": 999,
+  "type": "fullstack",
+  "backend_interface": {
+    "queries": {
+      "userFeatures": "returns: [Feature!]!",
+      "featureByKey": "returns: Feature"
+    },
+    "mutations": {
+      "enableFeature": "returns: Feature!",
+      "disableFeature": "returns: Feature!"
+    },
+    "types": {
+      "Feature": {
+        "key": "String!",
+        "name": "String!",
+        "enabled": "Boolean!",
+        "status": "FeatureStatus!",
+        "metadata": {
+          "type": "[MetadataField!]",
+          "fields": {
+            "key": "String!",
+            "value": "String!"
+          }
+        }
+      },
+      "MetadataField": {
+        "key": "String!",
+        "value": "String!"
+      }
+    },
+    "enums": {
+      "FeatureStatus": ["ENABLED", "DISABLED", "BETA", "DEPRECATED"]
+    }
+  },
+  "frontend_interface": {
+    "hooks": ["useFeatures", "useHasFeature", "useToggleFeature"],
+    "types": ["Feature", "FeatureStatus", "MetadataField"],
+    "components": ["FeatureList", "FeatureToggle", "FeatureCard"]
+  },
+  "test_interface": {
+    "backend_assertions": [
+      "Query userFeatures returns array of Feature objects",
+      "Mutation enableFeature sets enabled=true",
+      "Feature.status enum only accepts UPPERCASE values",
+      "Nested metadata array structure is validated"
+    ],
+    "frontend_assertions": [
+      "useFeatures hook returns Feature[] matching backend type",
+      "FeatureToggle component handles FeatureStatus enum",
+      "Hook handles nested metadata fields correctly"
+    ]
+  }
+}
