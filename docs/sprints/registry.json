@@ -16,14 +16,27 @@
     "3": {
       "status": "done",
       "completed": "2026-01-01",
-      "hours": 8.5
+      "hours": 8.5,
+      "epic": 1
     },
     "4": {
       "status": "done",
       "completed": "2026-01-02",
-      "hours": 8.3
+      "hours": 8.3,
+      "epic": 1
     }
   },
-  "epics": {},
-  "nextSprintNumber": 3
+  "epics": {
+    "1": {
+      "title": "Workflow v3.0 Enhancements",
+      "status": "in-progress",
+      "created": "2025-12-30",
+      "started": "2025-12-30",
+      "completed": null,
+      "totalSprints": 7,
+      "completedSprints": 3
+    }
+  },
+  "nextSprintNumber": 101,
+  "nextEpicNumber": 100
 }
