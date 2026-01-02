@@ -244,10 +244,10 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    Use the `sprint_lifecycle.py` utility to handle file movement:
    ```bash
    # First show what would happen (dry-run)
-   python scripts/sprint_lifecycle.py move-to-done $ARGUMENTS --dry-run
+   python3 scripts/sprint_lifecycle.py move-to-done $ARGUMENTS --dry-run
 
    # If dry-run looks good, execute the move
-   python scripts/sprint_lifecycle.py move-to-done $ARGUMENTS
+   python3 scripts/sprint_lifecycle.py move-to-done $ARGUMENTS
    ```
 
    This automatically:
@@ -277,7 +277,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    HOURS=<calculated hours>
 
    # Update registry with completion metadata
-   python scripts/sprint_lifecycle.py update-registry $ARGUMENTS \
+   python3 scripts/sprint_lifecycle.py update-registry $ARGUMENTS \
      --status done \
      --completed $(date +%Y-%m-%d) \
      --hours $HOURS
@@ -301,7 +301,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    SPRINT_TITLE=$(grep -m1 "^title:" <sprint-file-path> | sed 's/title: *//' | tr -d '"')
 
    # Create tag and auto-push to remote
-   python scripts/sprint_lifecycle.py create-tag $ARGUMENTS "$SPRINT_TITLE"
+   python3 scripts/sprint_lifecycle.py create-tag $ARGUMENTS "$SPRINT_TITLE"
    ```
 
    This automatically:
@@ -318,7 +318,7 @@ Update: `pre_flight_checklist.git_status_clean = true/false`
    Use the `sprint_lifecycle.py` utility to check if epic is complete:
    ```bash
    # If sprint is part of an epic, check completion
-   python scripts/sprint_lifecycle.py check-epic <epic-number>
+   python3 scripts/sprint_lifecycle.py check-epic <epic-number>
    ```
 
    This will:
