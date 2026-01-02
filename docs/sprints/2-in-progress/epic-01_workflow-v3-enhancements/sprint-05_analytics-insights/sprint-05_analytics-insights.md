@@ -1,3 +1,17 @@
+---
+sprint: 5
+title: "Analytics & Insights"
+epic: 1
+type: backend
+status: in-progress
+created: 2026-01-02T12:47:18Z
+started: 2026-01-02T12:47:18Z
+completed: null
+hours: null
+workflow_version: "3.1.0"
+
+---
+
 # Sprint 5: Analytics & Insights
 
 ## Overview

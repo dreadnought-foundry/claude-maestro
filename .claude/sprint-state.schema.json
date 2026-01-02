@@ -1,0 +1,256 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://claude-maestro.dev/schemas/sprint-state.json",
+  "title": "Sprint State",
+  "description": "Sprint execution state tracking for analytics and workflow enforcement",
+  "type": "object",
+  "required": ["sprint_number", "current_step", "started_at"],
+  "properties": {
+    "sprint_number": {
+      "type": "integer",
+      "description": "Sprint number being executed",
+      "minimum": 1
+    },
+    "current_step": {
+      "type": "string",
+      "description": "Current workflow step (e.g., '1.1', '2.3')",
+      "pattern": "^[1-6]\\.[1-9]$"
+    },
+    "started_at": {
+      "type": "string",
+      "description": "ISO timestamp when sprint started",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "description": "ISO timestamp when sprint completed (null if in progress)",
+      "format": "date-time"
+    },
+    "type": {
+      "type": "string",
+      "description": "Sprint type for quality gate selection",
+      "enum": ["fullstack", "backend", "frontend", "research", "spike", "infrastructure"],
+      "default": "fullstack"
+    },
+    "completed_steps": {
+      "type": "array",
+      "description": "History of completed steps with timestamps",
+      "items": {
+        "type": "object",
+        "required": ["step", "completed_at"],
+        "properties": {
+          "step": {
+            "type": "string",
+            "description": "Step identifier (e.g., '1.1')",
+            "pattern": "^[1-6]\\.[1-9]$"
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO timestamp when step completed",
+            "format": "date-time"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "description": "Duration of step in seconds",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes about step completion"
+          }
+        }
+      }
+    },
+    "agent_executions": {
+      "type": "array",
+      "description": "Agent execution history with timing and metrics",
+      "items": {
+        "type": "object",
+        "required": ["agent", "phase", "started_at", "completed_at"],
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "Agent name (e.g., 'Plan', 'product-engineer', 'quality-engineer')",
+            "examples": ["Plan", "product-engineer", "quality-engineer", "Architect"]
+          },
+          "phase": {
+            "type": "string",
+            "description": "Phase when agent executed (e.g., '1.1', '2.2')",
+            "pattern": "^[1-6]\\.[1-9]$"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO timestamp when agent started",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO timestamp when agent completed",
+            "format": "date-time"
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "description": "Duration in seconds",
+            "minimum": 0
+          },
+          "output_length": {
+            "type": "integer",
+            "description": "Character length of agent output",
+            "minimum": 0
+          },
+          "estimated_tokens": {
+            "type": "integer",
+            "description": "Estimated token count (output_length / 4)",
+            "minimum": 0
+          },
+          "files_modified": {
+            "type": "integer",
+            "description": "Number of files modified by agent",
+            "minimum": 0
+          },
+          "exit_status": {
+            "type": "string",
+            "description": "Agent exit status",
+            "enum": ["success", "error", "timeout", "cancelled"]
+          }
+        }
+      }
+    },
+    "coverage_delta": {
+      "type": "object",
+      "description": "Test coverage change during sprint",
+      "required": ["before", "after", "delta"],
+      "properties": {
+        "before": {
+          "type": ["number", "null"],
+          "description": "Coverage percentage before sprint",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "after": {
+          "type": ["number", "null"],
+          "description": "Coverage percentage after sprint",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "delta": {
+          "type": ["number", "null"],
+          "description": "Coverage change (after - before)"
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Required coverage threshold for sprint type",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "met_threshold": {
+          "type": "boolean",
+          "description": "Whether coverage met sprint type threshold"
+        }
+      }
+    },
+    "phase_breakdown": {
+      "type": "object",
+      "description": "Time spent in each workflow phase (hours)",
+      "properties": {
+        "planning": {
+          "type": "number",
+          "description": "Hours spent in planning phase",
+          "minimum": 0
+        },
+        "implementation": {
+          "type": "number",
+          "description": "Hours spent in implementation phase",
+          "minimum": 0
+        },
+        "validation": {
+          "type": "number",
+          "description": "Hours spent in validation phase",
+          "minimum": 0
+        },
+        "documentation": {
+          "type": "number",
+          "description": "Hours spent in documentation phase",
+          "minimum": 0
+        },
+        "commit": {
+          "type": "number",
+          "description": "Hours spent in commit phase",
+          "minimum": 0
+        },
+        "completion": {
+          "type": "number",
+          "description": "Hours spent in completion phase",
+          "minimum": 0
+        }
+      }
+    },
+    "bottlenecks": {
+      "type": "array",
+      "description": "Identified workflow bottlenecks",
+      "items": {
+        "type": "object",
+        "required": ["phase", "percentage_over"],
+        "properties": {
+          "phase": {
+            "type": "string",
+            "description": "Phase that is a bottleneck",
+            "enum": ["planning", "implementation", "validation", "documentation", "commit", "completion"]
+          },
+          "current_percentage": {
+            "type": "number",
+            "description": "Current phase percentage of total time",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "avg_percentage": {
+            "type": "number",
+            "description": "Historical average percentage for this phase",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "percentage_over": {
+            "type": "number",
+            "description": "Percentage over historical average",
+            "minimum": 0
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Recommendation to address bottleneck"
+          }
+        }
+      }
+    },
+    "blocked": {
+      "type": "boolean",
+      "description": "Whether sprint is blocked by external dependency",
+      "default": false
+    },
+    "blocked_reason": {
+      "type": "string",
+      "description": "Reason sprint is blocked (if blocked=true)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional sprint metadata",
+      "properties": {
+        "epic_id": {
+          "type": ["integer", "null"],
+          "description": "Epic this sprint belongs to"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for categorization",
+          "items": {
+            "type": "string"
+          }
+        },
+        "priority": {
+          "type": "string",
+          "description": "Sprint priority",
+          "enum": ["low", "medium", "high", "critical"]
+        }
+      }
+    }
+  }
+}
