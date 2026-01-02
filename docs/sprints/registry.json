@@ -24,6 +24,11 @@
       "completed": "2026-01-02",
       "hours": 8.3,
       "epic": 1
+    },
+    "5": {
+      "status": "done",
+      "completed": "2026-01-02",
+      "hours": 10.1
     }
   },
   "epics": {
