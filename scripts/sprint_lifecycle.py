@@ -1474,6 +1474,259 @@ def archive_epic(epic_num: int, dry_run: bool = False) -> dict:
     return summary
 
 
+def block_sprint(sprint_num: int, reason: str, dry_run: bool = False) -> dict:
+    """
+    Block a sprint: rename with --blocked suffix, update state.
+
+    Args:
+        sprint_num: Sprint number to block
+        reason: Reason for blocking
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with block summary
+
+    Raises:
+        FileOperationError: If sprint file not found
+        ValidationError: If sprint already blocked
+
+    Example:
+        >>> summary = block_sprint(4, "Waiting for API access")
+        >>> print(summary['status'])  # 'blocked'
+    """
+    project_root = find_project_root()
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+
+    if not sprint_file:
+        raise FileOperationError(
+            f"Sprint {sprint_num} not found"
+        )
+
+    # Check if already blocked
+    if "--blocked" in sprint_file.name:
+        raise ValidationError(
+            f"Sprint {sprint_num} already blocked: {sprint_file}"
+        )
+
+    # Read YAML for metadata
+    with open(sprint_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Sprint {sprint_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    started_match = re.search(r'^started:\s*(.+)$', yaml_content, re.MULTILINE)
+
+    title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
+
+    # Calculate hours worked so far
+    hours = None
+    if started_match:
+        started_str = started_match.group(1).strip()
+        if started_str and started_str.lower() != 'null':
+            started = datetime.fromisoformat(started_str.replace('Z', '+00:00'))
+            blocked = datetime.now().astimezone()
+            hours = round((blocked - started).total_seconds() / 3600, 1)
+
+    if dry_run:
+        print(f"[DRY RUN] Would block sprint {sprint_num}:")
+        print(f"  Title: {title}")
+        print(f"  Reason: {reason}")
+        print(f"  Hours so far: {hours if hours else 'N/A'}")
+        print(f"  1. Update YAML (status=blocked, blocker, hours_before_block)")
+        print(f"  2. Rename with --blocked suffix")
+        print(f"  3. Update state file")
+        return {"status": "dry-run", "sprint_num": sprint_num}
+
+    # Update YAML frontmatter
+    blocked_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    updates = {
+        "status": "blocked",
+        "blocked_at": blocked_time,
+        "blocker": reason
+    }
+    if hours:
+        updates["hours_before_block"] = hours
+
+    _update_yaml_frontmatter(sprint_file, updates)
+
+    # Rename with --blocked suffix
+    if sprint_file.parent.name.startswith("sprint-"):
+        # Sprint in subdirectory
+        sprint_subdir = sprint_file.parent
+        new_dir_name = sprint_subdir.name + "--blocked"
+        new_subdir = sprint_subdir.with_name(new_dir_name)
+        sprint_subdir.rename(new_subdir)
+
+        new_name = sprint_file.name.replace(".md", "--blocked.md")
+        new_path = new_subdir / new_name
+    else:
+        # Sprint file directly in folder
+        new_name = sprint_file.name.replace(".md", "--blocked.md")
+        new_path = sprint_file.with_name(new_name)
+        sprint_file.rename(new_path)
+
+    # Update state file
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+        state["status"] = "blocked"
+        state["blocked_at"] = blocked_time
+        state["blocker"] = reason
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+
+    summary = {
+        "sprint_num": sprint_num,
+        "title": title,
+        "status": "blocked",
+        "reason": reason,
+        "hours": hours,
+        "new_path": str(new_path)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num}: {title} - BLOCKED")
+    print(f"{'='*60}")
+    print(f"Blocker: {reason}")
+    print(f"Hours before block: {hours if hours else 'N/A'}")
+    print(f"File: {new_path.name}")
+    print(f"To resume: /sprint-resume {sprint_num}")
+    print(f"{'='*60}")
+
+    return summary
+
+
+def resume_sprint(sprint_num: int, dry_run: bool = False) -> dict:
+    """
+    Resume a blocked sprint: remove --blocked suffix, update state.
+
+    Args:
+        sprint_num: Sprint number to resume
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with resume summary
+
+    Raises:
+        FileOperationError: If sprint file not found
+        ValidationError: If sprint not blocked
+
+    Example:
+        >>> summary = resume_sprint(4)
+        >>> print(summary['status'])  # 'resumed'
+    """
+    project_root = find_project_root()
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+
+    if not sprint_file:
+        raise FileOperationError(
+            f"Sprint {sprint_num} not found"
+        )
+
+    # Check if sprint is blocked
+    if "--blocked" not in sprint_file.name:
+        raise ValidationError(
+            f"Sprint {sprint_num} is not blocked. Current state: {sprint_file.name}"
+        )
+
+    # Read YAML for metadata
+    with open(sprint_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    if not yaml_match:
+        raise ValidationError(f"Sprint {sprint_num} missing YAML frontmatter")
+
+    yaml_content = yaml_match.group(1)
+    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    blocker_match = re.search(r'^blocker:\s*(.+)$', yaml_content, re.MULTILINE)
+    hours_match = re.search(r'^hours_before_block:\s*([0-9.]+)', yaml_content, re.MULTILINE)
+
+    title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
+    blocker = blocker_match.group(1).strip().strip('"') if blocker_match else "Unknown"
+    hours_before = float(hours_match.group(1)) if hours_match else None
+
+    if dry_run:
+        print(f"[DRY RUN] Would resume sprint {sprint_num}:")
+        print(f"  Title: {title}")
+        print(f"  Was blocked by: {blocker}")
+        print(f"  Hours before block: {hours_before if hours_before else 'N/A'}")
+        print(f"  1. Update YAML (status=in-progress, resumed_at, previous_blocker)")
+        print(f"  2. Remove --blocked suffix")
+        print(f"  3. Update state file")
+        return {"status": "dry-run", "sprint_num": sprint_num}
+
+    # Update YAML frontmatter
+    resumed_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    updates = {
+        "status": "in-progress",
+        "resumed_at": resumed_time,
+        "previous_blocker": blocker
+    }
+    # Remove blocked-specific fields
+    updates["blocker"] = None
+    updates["blocked_at"] = None
+
+    _update_yaml_frontmatter(sprint_file, updates)
+
+    # Remove --blocked suffix
+    if sprint_file.parent.name.startswith("sprint-") and "--blocked" in sprint_file.parent.name:
+        # Sprint in subdirectory
+        sprint_subdir = sprint_file.parent
+        new_dir_name = sprint_subdir.name.replace("--blocked", "")
+        new_subdir = sprint_subdir.with_name(new_dir_name)
+        sprint_subdir.rename(new_subdir)
+
+        new_name = sprint_file.name.replace("--blocked", "")
+        new_path = new_subdir / new_name
+    else:
+        # Sprint file directly in folder
+        new_name = sprint_file.name.replace("--blocked", "")
+        new_path = sprint_file.with_name(new_name)
+        sprint_file.rename(new_path)
+
+    # Update state file
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+        state["status"] = "in-progress"
+        state["resumed_at"] = resumed_time
+        state["previous_blocker"] = blocker
+        # Remove blocked fields
+        state.pop("blocker", None)
+        state.pop("blocked_at", None)
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+
+    summary = {
+        "sprint_num": sprint_num,
+        "title": title,
+        "status": "resumed",
+        "previous_blocker": blocker,
+        "hours_before_block": hours_before,
+        "new_path": str(new_path)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num}: {title} - RESUMED")
+    print(f"{'='*60}")
+    print(f"Previously blocked by: {blocker}")
+    print(f"Hours before block: {hours_before if hours_before else 'N/A'}")
+    print(f"File: {new_path.name}")
+    print(f"Use /sprint-next {sprint_num} to continue")
+    print(f"{'='*60}")
+
+    return summary
+
+
 def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     """
     Complete a sprint with full automation: pre-flight checks, file movement,
@@ -1685,6 +1938,17 @@ def main():
     abort_parser.add_argument("reason", help="Reason for aborting")
     abort_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
 
+    # block-sprint command
+    block_parser = subparsers.add_parser("block-sprint", help="Block a sprint (mark as blocked)")
+    block_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    block_parser.add_argument("reason", help="Reason for blocking")
+    block_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
+    # resume-sprint command
+    resume_parser = subparsers.add_parser("resume-sprint", help="Resume a blocked sprint")
+    resume_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    resume_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
     # start-epic command
     start_epic_parser = subparsers.add_parser("start-epic", help="Start an epic (move to in-progress)")
     start_epic_parser.add_argument("epic_num", type=int, help="Epic number")
@@ -1800,6 +2064,22 @@ def main():
                 print(f"  New path: {result['new_path']}")
                 if result.get('hours'):
                     print(f"  Hours worked: {result['hours']:.1f}")
+
+        elif args.command == "block-sprint":
+            result = block_sprint(args.sprint_num, args.reason, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Blocked sprint {result['sprint_num']}: {result['title']}")
+                print(f"  Reason: {args.reason}")
+                print(f"  New path: {result['new_path']}")
+                if result.get('hours'):
+                    print(f"  Hours worked: {result['hours']:.1f}")
+
+        elif args.command == "resume-sprint":
+            result = resume_sprint(args.sprint_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Resumed sprint {result['sprint_num']}: {result['title']}")
+                print(f"  Previously blocked by: {result['previous_blocker']}")
+                print(f"  New path: {result['new_path']}")
 
         elif args.command == "start-epic":
             result = start_epic(args.epic_num, dry_run=args.dry_run)
