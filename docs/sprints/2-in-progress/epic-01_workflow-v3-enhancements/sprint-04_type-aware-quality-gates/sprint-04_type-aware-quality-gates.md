@@ -1,3 +1,16 @@
+---
+sprint: 4
+title: "Type-Aware Quality Gates"
+epic: 1
+status: in-progress
+created: 2026-01-02T11:05:04Z
+started: 2026-01-02T11:05:04Z
+completed: null
+hours: null
+workflow_version: "3.1.0"
+
+---
+
 # Sprint 4: Type-Aware Quality Gates
 
 ## Overview

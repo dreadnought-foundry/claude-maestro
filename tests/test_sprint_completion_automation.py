@@ -456,5 +456,182 @@ No postmortem here!
         assert sprint_file.stat().st_mtime == original_mtime
 
 
+class TestStartSprintAutomation:
+    """Test start-sprint automation handles all file location scenarios."""
+
+    @pytest.fixture
+    def temp_project_with_epic(self, tmp_path):
+        """Create project with epic structure in 2-in-progress."""
+        # Create directory structure
+        epic_dir = tmp_path / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic"
+        sprint_dir = epic_dir / "sprint-10_test-sprint"
+        sprint_dir.mkdir(parents=True)
+        (tmp_path / "docs" / "sprints" / "1-todo").mkdir(parents=True)
+        (tmp_path / ".claude").mkdir()
+
+        # Create WORKFLOW_VERSION
+        (tmp_path / ".claude" / "WORKFLOW_VERSION").write_text("3.1.0")
+
+        # Create registry
+        registry = {"sprints": [], "epics": []}
+        (tmp_path / "docs" / "sprints" / "registry.json").write_text(json.dumps(registry))
+
+        return tmp_path
+
+    def test_epic_sprint_already_in_progress_found(self, temp_project_with_epic):
+        """Test that start-sprint finds epic sprints already in 2-in-progress."""
+        # Create sprint file in epic folder (already in progress)
+        sprint_dir = temp_project_with_epic / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic" / "sprint-10_test-sprint"
+        sprint_file = sprint_dir / "sprint-10_test-sprint.md"
+        sprint_file.write_text("""---
+sprint: 10
+title: Test Sprint
+epic: 1
+status: planning
+workflow_version: "3.1.0"
+---
+
+# Sprint 10: Test Sprint
+
+## Goal
+Test that epic sprints in 2-in-progress are found.
+""")
+
+        # This should NOT raise "Sprint not found" error
+        from scripts.sprint_lifecycle import start_sprint, find_project_root
+
+        # Mock find_project_root to return our temp directory
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            result = start_sprint(10, dry_run=True)
+            assert result["status"] == "dry-run"
+            assert result["sprint_num"] == 10
+
+    def test_sprint_without_yaml_gets_frontmatter_added(self, temp_project_with_epic):
+        """Test that sprints without YAML frontmatter get it added automatically."""
+        sprint_dir = temp_project_with_epic / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic" / "sprint-11_no-yaml"
+        sprint_dir.mkdir(parents=True)
+        sprint_file = sprint_dir / "sprint-11_no-yaml.md"
+
+        # Create sprint WITHOUT YAML frontmatter
+        sprint_file.write_text("""# Sprint 11: No YAML Test
+
+## Goal
+Test that YAML frontmatter is added automatically.
+
+## Requirements
+- Test item 1
+- Test item 2
+""")
+
+        from scripts.sprint_lifecycle import start_sprint
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            result = start_sprint(11)
+
+            # Should succeed and add frontmatter
+            assert result["status"] == "started"
+
+            # Verify frontmatter was added
+            content = sprint_file.read_text()
+            assert content.startswith("---\n")
+            assert "sprint: 11" in content
+            assert 'title: "No YAML Test"' in content
+            assert "workflow_version:" in content
+
+    def test_sprint_in_todo_not_found_in_progress(self, temp_project_with_epic):
+        """Test that standalone sprint in 1-todo is found (not in 2-in-progress)."""
+        # Create sprint in 1-todo (not in epic, not started)
+        todo_dir = temp_project_with_epic / "docs" / "sprints" / "1-todo"
+        sprint_file = todo_dir / "sprint-12_standalone.md"
+        sprint_file.write_text("""---
+sprint: 12
+title: Standalone Sprint
+status: planning
+workflow_version: "3.1.0"
+---
+
+# Sprint 12: Standalone Sprint
+""")
+
+        from scripts.sprint_lifecycle import start_sprint
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            result = start_sprint(12, dry_run=True)
+            assert result["status"] == "dry-run"
+
+    def test_completed_sprint_not_found(self, temp_project_with_epic):
+        """Test that --done sprints are excluded from search."""
+        # Create a completed sprint (should be excluded)
+        sprint_dir = temp_project_with_epic / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic" / "sprint-13_done-test--done"
+        sprint_dir.mkdir(parents=True)
+        sprint_file = sprint_dir / "sprint-13_done-test--done.md"
+        sprint_file.write_text("""---
+sprint: 13
+title: Done Test
+status: done
+---
+# Sprint 13
+""")
+
+        from scripts.sprint_lifecycle import start_sprint, FileOperationError
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            with pytest.raises(FileOperationError, match="not found"):
+                start_sprint(13)
+
+    def test_state_file_created_for_epic_sprint(self, temp_project_with_epic):
+        """Test that state file is created when starting epic sprint."""
+        sprint_dir = temp_project_with_epic / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic" / "sprint-14_state-test"
+        sprint_dir.mkdir(parents=True)
+        sprint_file = sprint_dir / "sprint-14_state-test.md"
+        sprint_file.write_text("""---
+sprint: 14
+title: State File Test
+epic: 1
+status: planning
+workflow_version: "3.1.0"
+---
+
+# Sprint 14: State File Test
+""")
+
+        from scripts.sprint_lifecycle import start_sprint
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            result = start_sprint(14)
+
+            # Verify state file was created
+            state_file = temp_project_with_epic / ".claude" / "sprint-14-state.json"
+            assert state_file.exists()
+
+            state = json.loads(state_file.read_text())
+            assert state["sprint_number"] == 14
+            assert state["status"] == "in_progress"
+            assert state["sprint_title"] == "State File Test"
+
+    def test_title_extracted_from_heading_when_no_frontmatter(self, temp_project_with_epic):
+        """Test that title is correctly extracted from markdown heading."""
+        sprint_dir = temp_project_with_epic / "docs" / "sprints" / "2-in-progress" / "epic-01_test-epic" / "sprint-15_title-test"
+        sprint_dir.mkdir(parents=True)
+        sprint_file = sprint_dir / "sprint-15_title-test.md"
+
+        # Sprint with no frontmatter - title should come from heading
+        sprint_file.write_text("""# Sprint 15: Extract This Title
+
+## Goal
+Test title extraction.
+""")
+
+        from scripts.sprint_lifecycle import start_sprint
+
+        with patch('scripts.sprint_lifecycle.find_project_root', return_value=temp_project_with_epic):
+            result = start_sprint(15)
+
+            # Verify title was extracted correctly
+            state_file = temp_project_with_epic / ".claude" / "sprint-15-state.json"
+            state = json.loads(state_file.read_text())
+            assert state["sprint_title"] == "Extract This Title"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

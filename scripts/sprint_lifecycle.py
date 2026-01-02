@@ -885,8 +885,10 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     """
     project_root = find_project_root()
 
-    # Find sprint in backlog or todo
+    # Find sprint in backlog, todo, or in-progress (for epic sprints)
     sprint_file = None
+    already_in_progress = False
+
     for folder in ["0-backlog", "1-todo"]:
         search_path = project_root / "docs" / "sprints" / folder
         if search_path.exists():
@@ -895,60 +897,82 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
                 sprint_file = found[0]
                 break
 
+    # If not found in backlog/todo, check if it's an epic sprint already in progress
+    if not sprint_file:
+        search_path = project_root / "docs" / "sprints" / "2-in-progress"
+        if search_path.exists():
+            # Look for sprint in epic folders (exclude --done files)
+            found = [f for f in search_path.glob(f"**/sprint-{sprint_num:02d}_*.md")
+                     if "--done" not in f.name]
+            if found:
+                sprint_file = found[0]
+                already_in_progress = True
+
     if not sprint_file:
         raise FileOperationError(
-            f"Sprint {sprint_num} not found in backlog or todo folders"
+            f"Sprint {sprint_num} not found in backlog, todo, or in-progress folders"
         )
 
     # Check if sprint is in an epic
     is_epic, epic_num = _is_epic_sprint(sprint_file)
 
-    # Read YAML frontmatter
+    # Read content and check for YAML frontmatter
     with open(sprint_file) as f:
         content = f.read()
 
     import re
     yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
-    if not yaml_match:
-        raise ValidationError(f"Sprint {sprint_num} missing YAML frontmatter")
 
-    yaml_content = yaml_match.group(1)
-    title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+    if yaml_match:
+        # Parse existing frontmatter
+        yaml_content = yaml_match.group(1)
+        title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+        if title_match:
+            title = title_match.group(1).strip().strip('"')
+        else:
+            # Try to get title from markdown heading
+            heading_match = re.search(r'^#\s+Sprint\s+\d+:\s*(.+)$', content, re.MULTILINE)
+            title = heading_match.group(1).strip() if heading_match else f"Sprint {sprint_num}"
+        needs_frontmatter = False
+    else:
+        # No frontmatter - extract title from markdown heading and add frontmatter
+        heading_match = re.search(r'^#\s+Sprint\s+\d+:\s*(.+)$', content, re.MULTILINE)
+        title = heading_match.group(1).strip() if heading_match else f"Sprint {sprint_num}"
+        needs_frontmatter = True
 
-    if not title_match:
-        raise ValidationError(f"Sprint {sprint_num} missing title")
+        # Read WORKFLOW_VERSION
+        version_file = project_root / ".claude" / "WORKFLOW_VERSION"
+        workflow_version = version_file.read_text().strip() if version_file.exists() else "3.1.0"
 
-    title = title_match.group(1).strip().strip('"')
+        # Add YAML frontmatter to file
+        frontmatter = f"""---
+sprint: {sprint_num}
+title: "{title}"
+epic: {epic_num if is_epic else 'null'}
+status: planning
+created: {datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")}
+started: null
+completed: null
+hours: null
+workflow_version: "{workflow_version}"
+---
+
+"""
+        with open(sprint_file, 'w') as f:
+            f.write(frontmatter + content)
+        print(f"✓ Added YAML frontmatter to sprint file")
 
     if dry_run:
         print(f"[DRY RUN] Would start sprint {sprint_num}:")
         print(f"  Title: {title}")
         print(f"  Epic: {epic_num if is_epic else 'standalone'}")
-        print(f"  1. Move to 2-in-progress/")
+        if already_in_progress:
+            print(f"  1. Sprint already in 2-in-progress/ (epic sprint)")
+        else:
+            print(f"  1. Move to 2-in-progress/")
         print(f"  2. Update YAML (status=in-progress, started=<now>)")
         print(f"  3. Create state file .claude/sprint-{sprint_num}-state.json")
         return {"status": "dry-run", "sprint_num": sprint_num}
-
-    # Move to in-progress
-    in_progress_dir = project_root / "docs" / "sprints" / "2-in-progress"
-    in_progress_dir.mkdir(parents=True, exist_ok=True)
-
-    if is_epic:
-        # Keep in epic folder structure
-        epic_folder_name = sprint_file.parent.name if "epic-" in sprint_file.parent.name else sprint_file.parent.parent.name
-        new_parent = in_progress_dir / epic_folder_name
-        new_parent.mkdir(parents=True, exist_ok=True)
-
-        if sprint_file.parent.name.startswith("sprint-"):
-            # Sprint in subdirectory
-            new_sprint_dir = new_parent / sprint_file.parent.name
-            new_sprint_dir.mkdir(parents=True, exist_ok=True)
-            new_path = new_sprint_dir / sprint_file.name
-        else:
-            new_path = new_parent / sprint_file.name
-    else:
-        # Standalone sprint
-        new_path = in_progress_dir / sprint_file.name
 
     # Update YAML frontmatter
     started_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -957,9 +981,34 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
         "started": started_time
     })
 
-    # Move file
-    shutil.move(str(sprint_file), str(new_path))
-    print(f"✓ Moved to: {new_path}")
+    # Move to in-progress (skip if already there - epic sprint case)
+    if already_in_progress:
+        new_path = sprint_file
+        print(f"✓ Sprint already in progress (epic sprint): {sprint_file}")
+    else:
+        in_progress_dir = project_root / "docs" / "sprints" / "2-in-progress"
+        in_progress_dir.mkdir(parents=True, exist_ok=True)
+
+        if is_epic:
+            # Keep in epic folder structure
+            epic_folder_name = sprint_file.parent.name if "epic-" in sprint_file.parent.name else sprint_file.parent.parent.name
+            new_parent = in_progress_dir / epic_folder_name
+            new_parent.mkdir(parents=True, exist_ok=True)
+
+            if sprint_file.parent.name.startswith("sprint-"):
+                # Sprint in subdirectory
+                new_sprint_dir = new_parent / sprint_file.parent.name
+                new_sprint_dir.mkdir(parents=True, exist_ok=True)
+                new_path = new_sprint_dir / sprint_file.name
+            else:
+                new_path = new_parent / sprint_file.name
+        else:
+            # Standalone sprint
+            new_path = in_progress_dir / sprint_file.name
+
+        # Move file
+        shutil.move(str(sprint_file), str(new_path))
+        print(f"✓ Moved to: {new_path}")
 
     # Create state file
     state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
