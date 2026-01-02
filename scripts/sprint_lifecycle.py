@@ -1727,6 +1727,470 @@ def resume_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     return summary
 
 
+def get_sprint_status(sprint_num: int) -> dict:
+    """
+    Get current sprint status and progress.
+
+    Args:
+        sprint_num: Sprint number to check
+
+    Returns:
+        Dict with sprint status information
+
+    Raises:
+        FileOperationError: If sprint or state file not found
+
+    Example:
+        >>> status = get_sprint_status(4)
+        >>> print(status['status'])  # 'in-progress'
+    """
+    project_root = find_project_root()
+
+    # Read state file
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if not state_file.exists():
+        raise FileOperationError(
+            f"No state file for sprint {sprint_num}. Sprint may not be started."
+        )
+
+    with open(state_file) as f:
+        state = json.load(f)
+
+    # Find sprint file
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+    if not sprint_file:
+        raise FileOperationError(f"Sprint {sprint_num} file not found")
+
+    # Read YAML frontmatter
+    with open(sprint_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    yaml_data = {}
+    if yaml_match:
+        yaml_content = yaml_match.group(1)
+        for line in yaml_content.split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                yaml_data[key.strip()] = value.strip()
+
+    status = {
+        "sprint_num": sprint_num,
+        "title": yaml_data.get("title", "Unknown").strip('"'),
+        "status": state.get("status", yaml_data.get("status", "Unknown")),
+        "workflow_version": state.get("workflow_version", "1.0"),
+        "started": yaml_data.get("started"),
+        "completed": yaml_data.get("completed"),
+        "current_step": state.get("current_step"),
+        "sprint_file": str(sprint_file)
+    }
+
+    # Display status
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num}: {status['title']}")
+    print(f"{'='*60}")
+    print(f"Status: {status['status']}")
+    print(f"Workflow: v{status['workflow_version']}")
+    if status['started']:
+        print(f"Started: {status['started']}")
+    if status['current_step']:
+        print(f"Current step: {status['current_step']}")
+    print(f"File: {sprint_file.name}")
+    print(f"{'='*60}")
+
+    return status
+
+
+def get_epic_status(epic_num: int) -> dict:
+    """
+    Get detailed epic status with sprint progress.
+
+    Args:
+        epic_num: Epic number to check
+
+    Returns:
+        Dict with epic status information
+
+    Raises:
+        FileOperationError: If epic not found
+
+    Example:
+        >>> status = get_epic_status(1)
+        >>> print(status['progress'])  # 0.6 (60%)
+    """
+    project_root = find_project_root()
+    epic_num_str = f"{epic_num:02d}"
+
+    # Find epic folder
+    epic_folder = None
+    for folder in ["0-backlog", "1-todo", "2-in-progress", "3-done", "6-archived"]:
+        search_path = project_root / "docs" / "sprints" / folder
+        if search_path.exists():
+            found = list(search_path.glob(f"epic-{epic_num_str}_*"))
+            if found and found[0].is_dir():
+                epic_folder = found[0]
+                break
+
+    if not epic_folder:
+        raise FileOperationError(f"Epic {epic_num} not found")
+
+    epic_file = epic_folder / "_epic.md"
+    if not epic_file.exists():
+        raise FileOperationError(f"Epic {epic_num} missing _epic.md")
+
+    # Read epic file
+    with open(epic_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    yaml_data = {}
+    if yaml_match:
+        yaml_content = yaml_match.group(1)
+        for line in yaml_content.split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                yaml_data[key.strip()] = value.strip()
+
+    title = yaml_data.get("title", "Unknown").strip('"')
+    status = yaml_data.get("status", "Unknown")
+
+    # Count sprints
+    sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+    total = len(sprint_files)
+    done = len([f for f in sprint_files if "--done" in f.name])
+    aborted = len([f for f in sprint_files if "--aborted" in f.name])
+    blocked = len([f for f in sprint_files if "--blocked" in f.name])
+    in_progress = total - done - aborted - blocked
+
+    progress = done / total if total > 0 else 0
+
+    epic_status = {
+        "epic_num": epic_num,
+        "title": title,
+        "status": status,
+        "location": epic_folder.parent.name,
+        "total_sprints": total,
+        "done": done,
+        "in_progress": in_progress,
+        "blocked": blocked,
+        "aborted": aborted,
+        "progress": progress
+    }
+
+    # Display status
+    print(f"\n{'='*60}")
+    print(f"Epic {epic_num}: {title}")
+    print(f"{'='*60}")
+    print(f"Status: {status}")
+    print(f"Location: {epic_folder.parent.name}")
+    print(f"Sprints: {done}/{total} done ({progress*100:.0f}%)")
+    if in_progress > 0:
+        print(f"  In progress: {in_progress}")
+    if blocked > 0:
+        print(f"  Blocked: {blocked}")
+    if aborted > 0:
+        print(f"  Aborted: {aborted}")
+    print(f"{'='*60}")
+
+    return epic_status
+
+
+def list_epics() -> list:
+    """
+    List all epics with their progress.
+
+    Returns:
+        List of dicts with epic information
+
+    Example:
+        >>> epics = list_epics()
+        >>> for epic in epics:
+        ...     print(f"Epic {epic['epic_num']}: {epic['progress']*100:.0f}%")
+    """
+    project_root = find_project_root()
+    sprints_dir = project_root / "docs" / "sprints"
+
+    if not sprints_dir.exists():
+        print("No sprints directory found")
+        return []
+
+    # Find all epic folders
+    epic_folders = []
+    for folder in ["0-backlog", "1-todo", "2-in-progress", "3-done", "6-archived"]:
+        folder_path = sprints_dir / folder
+        if folder_path.exists():
+            for epic_dir in folder_path.glob("epic-*"):
+                if epic_dir.is_dir():
+                    epic_folders.append(epic_dir)
+
+    epics = []
+    for epic_folder in sorted(epic_folders):
+        # Extract epic number
+        import re
+        match = re.search(r'epic-(\d+)', epic_folder.name)
+        if not match:
+            continue
+
+        epic_num = int(match.group(1))
+
+        # Read epic file
+        epic_file = epic_folder / "_epic.md"
+        if not epic_file.exists():
+            continue
+
+        with open(epic_file) as f:
+            content = f.read()
+
+        yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+        title = "Unknown"
+        if yaml_match:
+            yaml_content = yaml_match.group(1)
+            title_match = re.search(r'^title:\s*(.+)$', yaml_content, re.MULTILINE)
+            if title_match:
+                title = title_match.group(1).strip().strip('"')
+
+        # Count sprints
+        sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+        total = len(sprint_files)
+        done = len([f for f in sprint_files if "--done" in f.name])
+
+        progress = done / total if total > 0 else 0
+
+        epics.append({
+            "epic_num": epic_num,
+            "title": title,
+            "total": total,
+            "done": done,
+            "progress": progress,
+            "location": epic_folder.parent.name
+        })
+
+    # Display list
+    print(f"\n{'='*60}")
+    print("Epics:")
+    print(f"{'='*60}")
+    for epic in epics:
+        bar_length = 10
+        filled = int(epic['progress'] * bar_length)
+        bar = '█' * filled + '░' * (bar_length - filled)
+        location_marker = {
+            "0-backlog": "📦",
+            "1-todo": "📋",
+            "2-in-progress": "⚙️",
+            "3-done": "✅",
+            "6-archived": "📁"
+        }.get(epic['location'], "  ")
+
+        print(f"  {location_marker} {epic['epic_num']:02d}. {epic['title'][:40]:<40} [{bar}] {epic['progress']*100:3.0f}%  ({epic['done']}/{epic['total']} sprints)")
+    print(f"{'='*60}")
+    print(f"Total: {len(epics)} epics")
+    print(f"{'='*60}")
+
+    return epics
+
+
+def recover_sprint(sprint_num: int, dry_run: bool = False) -> dict:
+    """
+    Recover a sprint file that ended up in the wrong location.
+
+    Args:
+        sprint_num: Sprint number to recover
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with recovery summary
+
+    Raises:
+        FileOperationError: If sprint file not found
+        ValidationError: If sprint is already in correct location
+
+    Example:
+        >>> summary = recover_sprint(4)
+        >>> print(summary['new_path'])
+    """
+    project_root = find_project_root()
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+
+    if not sprint_file:
+        raise FileOperationError(f"Sprint {sprint_num} not found")
+
+    # Determine correct location
+    is_epic, epic_num = _is_epic_sprint(sprint_file)
+    has_done_suffix = "--done" in sprint_file.name
+
+    # Determine expected location
+    if not has_done_suffix:
+        raise ValidationError(
+            f"Sprint {sprint_num} is not complete (no --done suffix). Nothing to recover."
+        )
+
+    if is_epic:
+        # Epic sprint - should be in epic folder (either in-progress or done depending on epic status)
+        expected_parent = sprint_file.parent
+        if not expected_parent.name.startswith("epic-"):
+            expected_parent = expected_parent.parent
+
+        # Check if we need to move
+        if "3-done" in str(sprint_file) and "2-in-progress" in str(expected_parent):
+            # Epic sprint in wrong location
+            correct_path = expected_parent / sprint_file.name
+        else:
+            raise ValidationError(f"Sprint {sprint_num} is already in correct location")
+    else:
+        # Standalone sprint - should be in 3-done
+        correct_folder = project_root / "docs" / "sprints" / "3-done"
+        correct_path = correct_folder / sprint_file.name
+
+        if sprint_file.parent == correct_folder:
+            raise ValidationError(f"Sprint {sprint_num} is already in correct location")
+
+    if dry_run:
+        print(f"[DRY RUN] Would recover sprint {sprint_num}:")
+        print(f"  From: {sprint_file}")
+        print(f"  To: {correct_path}")
+        return {"status": "dry-run", "sprint_num": sprint_num}
+
+    # Move file
+    correct_path.parent.mkdir(parents=True, exist_ok=True)
+    sprint_file.rename(correct_path)
+
+    # Update state file if exists
+    state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
+    if state_file.exists():
+        with open(state_file) as f:
+            state = json.load(f)
+        state["sprint_file"] = str(correct_path)
+        with open(state_file, 'w') as f:
+            json.dump(state, f, indent=2)
+
+    summary = {
+        "sprint_num": sprint_num,
+        "old_path": str(sprint_file),
+        "new_path": str(correct_path)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num} - RECOVERED")
+    print(f"{'='*60}")
+    print(f"From: {sprint_file}")
+    print(f"To: {correct_path}")
+    print(f"{'='*60}")
+
+    return summary
+
+
+def add_to_epic(sprint_num: int, epic_num: int, dry_run: bool = False) -> dict:
+    """
+    Add an existing sprint to an epic.
+
+    Args:
+        sprint_num: Sprint number to add
+        epic_num: Epic number to add sprint to
+        dry_run: If True, preview changes without executing
+
+    Returns:
+        Dict with operation summary
+
+    Raises:
+        FileOperationError: If sprint or epic not found
+        ValidationError: If sprint already in epic
+
+    Example:
+        >>> summary = add_to_epic(81, 10)
+        >>> print(summary['epic_title'])
+    """
+    project_root = find_project_root()
+
+    # Find sprint file
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+    if not sprint_file:
+        raise FileOperationError(f"Sprint {sprint_num} not found")
+
+    # Check if already in epic
+    is_epic, current_epic = _is_epic_sprint(sprint_file)
+    if is_epic:
+        raise ValidationError(
+            f"Sprint {sprint_num} is already in epic {current_epic}"
+        )
+
+    # Find epic folder
+    epic_num_str = f"{epic_num:02d}"
+    epic_folder = None
+    for folder in ["0-backlog", "1-todo", "2-in-progress"]:
+        search_path = project_root / "docs" / "sprints" / folder
+        if search_path.exists():
+            found = list(search_path.glob(f"epic-{epic_num_str}_*"))
+            if found and found[0].is_dir():
+                epic_folder = found[0]
+                break
+
+    if not epic_folder:
+        raise FileOperationError(f"Epic {epic_num} not found")
+
+    epic_file = epic_folder / "_epic.md"
+    if not epic_file.exists():
+        raise FileOperationError(f"Epic {epic_num} missing _epic.md")
+
+    # Read epic title
+    with open(epic_file) as f:
+        content = f.read()
+
+    import re
+    yaml_match = re.search(r'^---\n(.*?)\n---', content, re.DOTALL)
+    epic_title = "Unknown"
+    if yaml_match:
+        title_match = re.search(r'^title:\s*(.+)$', yaml_match.group(1), re.MULTILINE)
+        if title_match:
+            epic_title = title_match.group(1).strip().strip('"')
+
+    # Read sprint title
+    with open(sprint_file) as f:
+        sprint_content = f.read()
+
+    sprint_yaml = re.search(r'^---\n(.*?)\n---', sprint_content, re.DOTALL)
+    sprint_title = "Unknown"
+    if sprint_yaml:
+        title_match = re.search(r'^title:\s*(.+)$', sprint_yaml.group(1), re.MULTILINE)
+        if title_match:
+            sprint_title = title_match.group(1).strip().strip('"')
+
+    new_path = epic_folder / sprint_file.name
+
+    if dry_run:
+        print(f"[DRY RUN] Would add sprint {sprint_num} to epic {epic_num}:")
+        print(f"  Sprint: {sprint_title}")
+        print(f"  Epic: {epic_title}")
+        print(f"  Move to: {new_path}")
+        print(f"  Update YAML: epic={epic_num}")
+        return {"status": "dry-run", "sprint_num": sprint_num, "epic_num": epic_num}
+
+    # Move sprint file
+    sprint_file.rename(new_path)
+
+    # Update sprint YAML
+    _update_yaml_frontmatter(new_path, {"epic": epic_num})
+
+    summary = {
+        "sprint_num": sprint_num,
+        "sprint_title": sprint_title,
+        "epic_num": epic_num,
+        "epic_title": epic_title,
+        "new_path": str(new_path)
+    }
+
+    print(f"\n{'='*60}")
+    print(f"Sprint {sprint_num} added to Epic {epic_num}")
+    print(f"{'='*60}")
+    print(f"Sprint: {sprint_title}")
+    print(f"Epic: {epic_title}")
+    print(f"New location: {new_path}")
+    print(f"{'='*60}")
+
+    return summary
+
+
 def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     """
     Complete a sprint with full automation: pre-flight checks, file movement,
@@ -1995,6 +2459,30 @@ def main():
     tag_parser.add_argument("--dry-run", action="store_true", help="Preview changes without executing")
     tag_parser.add_argument("--no-push", action="store_true", help="Don't auto-push tag to remote")
 
+    # === QUERY COMMANDS ===
+
+    # sprint-status command
+    sprint_status_parser = subparsers.add_parser("sprint-status", help="Get sprint status and progress")
+    sprint_status_parser.add_argument("sprint_num", type=int, help="Sprint number")
+
+    # epic-status command
+    epic_status_parser = subparsers.add_parser("epic-status", help="Get epic status with sprint progress")
+    epic_status_parser.add_argument("epic_num", type=int, help="Epic number")
+
+    # list-epics command
+    list_epics_parser = subparsers.add_parser("list-epics", help="List all epics with progress")
+
+    # recover-sprint command
+    recover_parser = subparsers.add_parser("recover-sprint", help="Recover sprint file in wrong location")
+    recover_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    recover_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
+    # add-to-epic command
+    add_epic_parser = subparsers.add_parser("add-to-epic", help="Add sprint to epic")
+    add_epic_parser.add_argument("sprint_num", type=int, help="Sprint number")
+    add_epic_parser.add_argument("epic_num", type=int, help="Epic number")
+    add_epic_parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -2137,6 +2625,27 @@ def main():
                 dry_run=args.dry_run,
                 auto_push=not args.no_push
             )
+
+        # === QUERY COMMAND HANDLERS ===
+
+        elif args.command == "sprint-status":
+            get_sprint_status(args.sprint_num)
+
+        elif args.command == "epic-status":
+            get_epic_status(args.epic_num)
+
+        elif args.command == "list-epics":
+            list_epics()
+
+        elif args.command == "recover-sprint":
+            result = recover_sprint(args.sprint_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Recovered sprint {result['sprint_num']}")
+
+        elif args.command == "add-to-epic":
+            result = add_to_epic(args.sprint_num, args.epic_num, dry_run=args.dry_run)
+            if not args.dry_run:
+                print(f"✓ Added sprint {result['sprint_num']} to epic {result['epic_num']}")
 
     except SprintLifecycleError as e:
         print(f"Error: {e}", file=sys.stderr)
