@@ -1,13 +1,14 @@
 ---
 sprint: 7
 title: Modular Automation Architecture
-status: planning
+status: in-progress
 workflow_version: "3.1"
 epic: 1
 created: 2026-01-01
-started: null
+started: 2026-01-06T20:02:57Z
 completed: null
 hours: null
+
 ---
 
 # Sprint 7: Modular Automation Architecture
@@ -26,13 +27,13 @@ hours: null
 
 ## Goal
 
-Refactor `scripts/sprint_lifecycle.py` (3,325 lines) into a modular package architecture with focused modules (<600 lines each), built in parallel and atomically cut over with zero downtime.
+Refactor `scripts/sprint_lifecycle.py` (4,115 lines) into a modular package architecture with focused modules (<600 lines each), built in parallel and atomically cut over with zero downtime.
 
 ## Background
 
-Sprint 2 delivered comprehensive automation covering 19 CLI commands for sprint/epic lifecycle management. The implementation consolidated all functionality in a single 3,325-line file (`sprint_lifecycle.py`). While this works, it creates maintainability challenges:
+Sprint 2 delivered comprehensive automation covering 27 CLI commands for sprint/epic lifecycle management. The implementation consolidated all functionality in a single 4,115-line file (`sprint_lifecycle.py`). While this works, it creates maintainability challenges:
 
-- **Large File Size**: 3,325 lines is difficult to navigate and understand
+- **Large File Size**: 4,115 lines is difficult to navigate and understand
 - **Mixed Concerns**: Registry, file operations, git operations, CLI parsing all in one file
 - **Limited Reusability**: Hard to import specific functionality without pulling in everything
 - **Testing Complexity**: Mocking becomes harder as file grows
@@ -105,9 +106,9 @@ Based on discussion:
 ### Functional Requirements
 
 - [ ] **Dead code cleanup**: Remove all unused functions/imports before refactoring
-- [ ] Create `scripts/sprint_automation/` package with 14 modules
+- [ ] Create `scripts/sprint_automation/` package with 17 modules
 - [ ] Maintain 100% backward compatibility (all existing imports work)
-- [ ] All 19 CLI commands produce identical output (v1 vs v2)
+- [ ] All 27 CLI commands produce identical output (v1 vs v2)
 - [ ] All 144 existing tests pass with new architecture
 - [ ] Module size limit: <600 lines per file
 
@@ -149,16 +150,19 @@ Based on discussion:
 ```
 scripts/sprint_automation/
 ├── __init__.py              # Public API exports
+├── constants.py             # Magic strings, status suffixes, folder names
 ├── exceptions.py            # Custom exceptions
 ├── utils/
 │   ├── file_ops.py          # File operations
 │   ├── git_ops.py           # Git operations
+│   ├── state.py             # State file operations (.claude/sprint-N-state.json)
 │   └── project.py           # Project utilities
 ├── registry/
 │   ├── manager.py           # Registry CRUD
 │   └── numbering.py         # Auto-numbering
 ├── sprint/
-│   ├── lifecycle.py         # Sprint lifecycle
+│   ├── lifecycle.py         # Sprint lifecycle (start, abort, block, resume)
+│   ├── completion.py        # Sprint completion (complete, move_to_done)
 │   ├── status.py            # Status queries
 │   └── postmortem.py        # Postmortem generation
 ├── epic/
@@ -170,6 +174,8 @@ scripts/sprint_automation/
     ├── parser.py            # Argument parsing
     └── handlers.py          # Command handlers
 ```
+
+**Module Count**: 17 files (up from 14, added constants.py, state.py, completion.py)
 
 ### Parallel Build Strategy
 
@@ -286,7 +292,7 @@ from sprint_automation import *
 - [ ] Dead code removed and documented (Phase 0 complete)
 - [ ] All 144 existing tests passing
 - [ ] Test coverage ≥84% (maintain or improve)
-- [ ] All 19 CLI commands produce identical output (v1 vs v2)
+- [ ] All 27 CLI commands produce identical output (v1 vs v2)
 - [ ] Backward-compatible imports work
 - [ ] No module >600 lines
 - [ ] Documentation updated
@@ -305,7 +311,7 @@ None - architecture design complete, implementation plan validated.
 
 **Priority**: High (technical debt reduction, enables future Epic 01 work)
 **Estimated Effort**: 14-20 hours (includes Phase 0 cleanup and Phase 9 archive)
-**Success Metric**: Reduce largest module from 3,325 lines to <600 lines
+**Success Metric**: Reduce largest module from 4,115 lines to <600 lines
 
 **Refactoring Benefits**:
 - Maintainability: Easier to find and modify code
