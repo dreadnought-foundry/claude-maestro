@@ -1,7 +1,7 @@
 ---
 sprint: 6
 title: Test Feature for Automation Demo
-status: planning
+status: aborted
 workflow_version: "2.1"
 epic: 1
 created: 2025-12-30
@@ -9,6 +9,9 @@ started: null
 completed: null
 hours: null
 estimatedHours: 3
+
+aborted_at: 2026-01-06T20:59:48Z
+abort_reason: Demo complete - automation validated by subsequent sprints
 ---
 
 # Sprint 6: Test Feature for Automation Demo
