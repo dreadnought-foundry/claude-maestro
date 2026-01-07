@@ -1,0 +1,226 @@
+{
+  "version": "1.0",
+  "description": "Workflow command reference for discoverability dashboard",
+  "categories": {
+    "sprint": {
+      "name": "Sprint Commands",
+      "description": "Manage sprint lifecycle",
+      "commands": [
+        {
+          "command": "/sprint-new",
+          "description": "Create a new sprint planning file",
+          "usage": "/sprint-new <title> [--epic N]",
+          "example": "/sprint-new \"Add user authentication\" --epic 1"
+        },
+        {
+          "command": "/sprint-start",
+          "description": "Start a sprint (creates state file, moves to in-progress)",
+          "usage": "/sprint-start <N>",
+          "example": "/sprint-start 5"
+        },
+        {
+          "command": "/sprint-status",
+          "description": "Show current sprint progress and next action",
+          "usage": "/sprint-status [N]",
+          "example": "/sprint-status 5"
+        },
+        {
+          "command": "/sprint-next",
+          "description": "Advance to next workflow step",
+          "usage": "/sprint-next",
+          "example": "/sprint-next"
+        },
+        {
+          "command": "/sprint-complete",
+          "description": "Complete sprint (postmortem, move to done, tag)",
+          "usage": "/sprint-complete <N>",
+          "example": "/sprint-complete 5"
+        },
+        {
+          "command": "/sprint-abort",
+          "description": "Abort sprint (cancelled, won't be completed)",
+          "usage": "/sprint-abort <N> <reason>",
+          "example": "/sprint-abort 5 \"Requirements changed\""
+        },
+        {
+          "command": "/sprint-blocked",
+          "description": "Mark sprint as blocked by external dependency",
+          "usage": "/sprint-blocked <N> <reason>",
+          "example": "/sprint-blocked 5 \"Waiting for API access\""
+        },
+        {
+          "command": "/sprint-resume",
+          "description": "Resume a blocked sprint",
+          "usage": "/sprint-resume <N>",
+          "example": "/sprint-resume 5"
+        },
+        {
+          "command": "/sprint-postmortem",
+          "description": "Generate postmortem analysis",
+          "usage": "/sprint-postmortem <N>",
+          "example": "/sprint-postmortem 5"
+        },
+        {
+          "command": "/sprint-add-to-epic",
+          "description": "Add existing sprint to an epic",
+          "usage": "/sprint-add-to-epic <sprint> <epic>",
+          "example": "/sprint-add-to-epic 5 1"
+        },
+        {
+          "command": "/sprint-recover",
+          "description": "Recover a sprint file in wrong location",
+          "usage": "/sprint-recover <N>",
+          "example": "/sprint-recover 5"
+        },
+        {
+          "command": "/sprint-analytics",
+          "description": "Show sprint analytics and insights",
+          "usage": "/sprint-analytics",
+          "example": "/sprint-analytics"
+        }
+      ]
+    },
+    "epic": {
+      "name": "Epic Commands",
+      "description": "Manage epic lifecycle",
+      "commands": [
+        {
+          "command": "/epic-new",
+          "description": "Create a new epic to group related sprints",
+          "usage": "/epic-new <title>",
+          "example": "/epic-new \"Workflow v3.0 Enhancements\""
+        },
+        {
+          "command": "/epic-start",
+          "description": "Start an epic (move to in-progress)",
+          "usage": "/epic-start <N>",
+          "example": "/epic-start 1"
+        },
+        {
+          "command": "/epic-status",
+          "description": "Show detailed status of an epic",
+          "usage": "/epic-status <N>",
+          "example": "/epic-status 1"
+        },
+        {
+          "command": "/epic-list",
+          "description": "List all epics with status and progress",
+          "usage": "/epic-list",
+          "example": "/epic-list"
+        },
+        {
+          "command": "/epic-complete",
+          "description": "Complete epic (all sprints must be done)",
+          "usage": "/epic-complete <N>",
+          "example": "/epic-complete 1"
+        },
+        {
+          "command": "/epic-archive",
+          "description": "Archive a completed epic",
+          "usage": "/epic-archive <N>",
+          "example": "/epic-archive 1"
+        }
+      ]
+    },
+    "project": {
+      "name": "Project Commands",
+      "description": "Project setup and configuration",
+      "commands": [
+        {
+          "command": "/project-create",
+          "description": "Initialize a new project with sprint workflow",
+          "usage": "/project-create",
+          "example": "/project-create"
+        },
+        {
+          "command": "/project-update",
+          "description": "Sync workflow updates from master environment",
+          "usage": "/project-update",
+          "example": "/project-update"
+        }
+      ]
+    },
+    "product": {
+      "name": "Product Commands",
+      "description": "Product planning and specification",
+      "commands": [
+        {
+          "command": "/create-spec",
+          "description": "Create a product specification",
+          "usage": "/create-spec",
+          "example": "/create-spec"
+        },
+        {
+          "command": "/execute-tasks",
+          "description": "Execute tasks from specification",
+          "usage": "/execute-tasks",
+          "example": "/execute-tasks"
+        }
+      ]
+    },
+    "help": {
+      "name": "Help Commands",
+      "description": "Get help and documentation",
+      "commands": [
+        {
+          "command": "/workflow-help",
+          "description": "Show all available workflow commands",
+          "usage": "/workflow-help [category]",
+          "example": "/workflow-help sprint"
+        }
+      ]
+    }
+  },
+  "phases": {
+    "1": {
+      "name": "Planning",
+      "steps": ["1.1", "1.2", "1.3", "1.4"],
+      "recommended_agents": ["Plan", "Explore"],
+      "description": "Read sprint, design approach, clarify requirements"
+    },
+    "1.5": {
+      "name": "Interface Contract",
+      "steps": ["1.5.1", "1.5.2"],
+      "recommended_agents": ["Plan"],
+      "description": "Define and validate interface contract (fullstack only)",
+      "applies_to": ["fullstack"]
+    },
+    "2": {
+      "name": "Test-First Implementation",
+      "steps": ["2.1", "2.2", "2.3", "2.4"],
+      "recommended_agents": ["product-engineer", "test-runner"],
+      "description": "Write tests, implement features, run tests"
+    },
+    "3": {
+      "name": "Validation & Refactoring",
+      "steps": ["3.1", "3.2", "3.3", "3.4"],
+      "recommended_agents": ["quality-engineer", "test-runner"],
+      "description": "Review quality, refactor code, re-test"
+    },
+    "4": {
+      "name": "Documentation",
+      "steps": ["4.1"],
+      "recommended_agents": ["file-creator"],
+      "description": "Generate dialog examples and docs"
+    },
+    "5": {
+      "name": "Commit",
+      "steps": ["5.1", "5.2"],
+      "recommended_agents": [],
+      "description": "Verify coverage gate and commit changes"
+    },
+    "6": {
+      "name": "Completion",
+      "steps": ["6.1", "6.2", "6.3", "6.4", "6.5", "6.6"],
+      "recommended_agents": [],
+      "description": "Finalize sprint, run checklist, close"
+    }
+  },
+  "quick_reference": {
+    "start_sprint": "/sprint-start <N>",
+    "check_status": "/sprint-status",
+    "next_step": "/sprint-next",
+    "complete": "/sprint-complete <N>",
+    "get_help": "/workflow-help"
+  }
+}

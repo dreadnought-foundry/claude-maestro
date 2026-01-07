@@ -2722,19 +2722,103 @@ def get_sprint_status(sprint_num: int) -> dict:
         "completed": yaml_data.get("completed"),
         "current_step": state.get("current_step"),
         "sprint_file": str(sprint_file),
+        "sprint_type": yaml_data.get("type", "fullstack"),
     }
 
-    # Display status
+    # Calculate progress from step
+    step_order = [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5.1",
+        "1.5.2",
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "5.1",
+        "5.2",
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4",
+        "6.5",
+        "6.6",
+    ]
+    current_step = status["current_step"] or "1.1"
+    try:
+        step_index = step_order.index(current_step)
+    except ValueError:
+        step_index = 0
+    progress_pct = int((step_index / len(step_order)) * 100)
+
+    # Determine phase info
+    phase_info = {
+        "1": ("Planning", ["Plan", "Explore"]),
+        "1.5": ("Interface Contract", ["Plan"]),
+        "2": ("Test-First Implementation", ["product-engineer", "test-runner"]),
+        "3": ("Validation & Refactoring", ["quality-engineer", "test-runner"]),
+        "4": ("Documentation", ["file-creator"]),
+        "5": ("Commit", []),
+        "6": ("Completion", []),
+    }
+
+    # Get current phase
+    if current_step.startswith("1.5"):
+        phase_num = "1.5"
+    else:
+        phase_num = current_step.split(".")[0]
+    phase_name, recommended_agents = phase_info.get(phase_num, ("Unknown", []))
+
+    # Build progress bar
+    bar_width = 20
+    filled = int(bar_width * progress_pct / 100)
+    bar = (
+        "=" * filled + ">" + " " * (bar_width - filled - 1)
+        if filled < bar_width
+        else "=" * bar_width
+    )
+    progress_bar = f"[{bar}] {progress_pct}%"
+
+    # Display enhanced status
     print(f"\n{'='*60}")
     print(f"Sprint {sprint_num}: {status['title']}")
     print(f"{'='*60}")
     print(f"Status: {status['status']}")
-    print(f"Workflow: v{status['workflow_version']}")
-    if status["started"]:
-        print(f"Started: {status['started']}")
-    if status["current_step"]:
-        print(f"Current step: {status['current_step']}")
-    print(f"File: {sprint_file.name}")
+    print(f"Progress: {progress_bar}")
+    print(f"Phase: {phase_num} - {phase_name}")
+    print(f"Current Step: {current_step}")
+    print(f"{'='*60}")
+
+    # Next actions
+    print("\nNEXT ACTIONS:")
+    print("  /sprint-next              Advance to next step")
+    if status["status"] == "in_progress":
+        print(f"  /sprint-status {sprint_num}          Refresh status")
+
+    # Recommended agents (if any)
+    if recommended_agents:
+        print("\nRECOMMENDED AGENTS:")
+        agent_descriptions = {
+            "Plan": "Design implementation approach",
+            "Explore": "Explore codebase structure",
+            "product-engineer": "Implement features",
+            "test-runner": "Run test suite",
+            "quality-engineer": "Review code quality",
+            "file-creator": "Create documentation",
+        }
+        for agent in recommended_agents:
+            desc = agent_descriptions.get(agent, "")
+            print(f"  {agent:<20} {desc}")
+
+    print(f"\n{'='*60}")
+    print("Run /workflow-help for full command reference")
     print(f"{'='*60}")
 
     return status
