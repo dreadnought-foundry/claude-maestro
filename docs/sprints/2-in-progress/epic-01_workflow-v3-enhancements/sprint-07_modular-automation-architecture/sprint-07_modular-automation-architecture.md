@@ -63,12 +63,21 @@ tests/test_*.py                       → product-engineer (reorganize into modu
 
 ### Integration Strategy
 
-Parallel build with atomic cutover:
-1. Build new modular package alongside existing file
-2. Implement in `sprint_lifecycle_v2.py` calling new package
-3. Run comparison tests (v1 vs v2 outputs)
-4. Atomic swap when v2 validated
-5. Cleanup temporary files
+**Build-Then-Cutover Approach** (zero risk to production):
+
+The existing `sprint_lifecycle.py` remains untouched until the new version is fully proven.
+
+1. **Build Phase**: Create new `sprint_automation/` package alongside existing file
+2. **Facade Phase**: Create `sprint_lifecycle_v2.py` that imports from new package
+3. **Prove Phase**: Run exhaustive comparison tests (v1 vs v2 outputs must be identical)
+4. **Tag Phase**: Create `pre-modular-refactor` git tag for easy rollback
+5. **Cutover Phase**: Atomic swap only after v2 is fully validated
+6. **Archive Phase**: Move old monolith to `docs/archive/`, tag `post-modular-refactor`
+7. **Cleanup Phase**: Delete temporary files, ensure no confusion in codebase
+
+**Key Principle**: The original file is never modified during development. We build the replacement, prove it works, tag for rollback, cut over, then archive the old version.
+
+**Recovery**: Rollback anytime via `git checkout pre-modular-refactor`
 
 ### TDD Approach
 
@@ -95,6 +104,7 @@ Based on discussion:
 
 ### Functional Requirements
 
+- [ ] **Dead code cleanup**: Remove all unused functions/imports before refactoring
 - [ ] Create `scripts/sprint_automation/` package with 14 modules
 - [ ] Maintain 100% backward compatibility (all existing imports work)
 - [ ] All 19 CLI commands produce identical output (v1 vs v2)
@@ -183,6 +193,22 @@ from sprint_automation import *
 
 ## Tasks
 
+### Phase 0: Dead Code Analysis & Cleanup (1-2 hours)
+**CRITICAL**: Before refactoring, ensure the file is clean. It has been morphed and changed multiple times.
+
+- [ ] Run static analysis to find unused functions/imports
+- [ ] Use `vulture` or similar tool to detect dead code
+- [ ] Manually verify each flagged item (some may be CLI entry points)
+- [ ] Remove confirmed dead code
+- [ ] Run full test suite to verify nothing broke
+- [ ] Document what was removed and why
+- [ ] Commit cleanup separately (before refactoring begins)
+
+**Why This Matters**:
+- Don't refactor dead code into new modules
+- Reduces total lines to refactor
+- Ensures clean baseline for comparison testing
+
 ### Phase 1: Package Structure (1-2 hours)
 - [ ] Create `scripts/sprint_automation/` directory
 - [ ] Create all `__init__.py` files
@@ -233,13 +259,23 @@ from sprint_automation import *
 - [ ] Verify 84%+ coverage maintained
 
 ### Phase 8: Cutover (30 minutes)
-- [ ] Backup v1: `mv sprint_lifecycle.py sprint_lifecycle_v1_backup.py`
+- [ ] Create pre-cutover tag: `git tag pre-modular-refactor -m "Last commit before sprint_lifecycle.py refactor"`
 - [ ] Promote v2: `mv sprint_lifecycle_v2.py sprint_lifecycle.py`
 - [ ] Run full test suite
 - [ ] Test all 19 CLI commands
 - [ ] Verify existing imports still work
 
-### Phase 9: Documentation (1 hour)
+### Phase 9: Archive & Cleanup (30 minutes)
+- [ ] Create post-cutover tag: `git tag post-modular-refactor -m "Modular architecture complete"`
+- [ ] Archive old monolith to `docs/archive/sprint_lifecycle_v1_monolith.py`
+- [ ] Add README to archive explaining what it is and how to restore
+- [ ] Delete any temporary files (v1 backup, etc.)
+- [ ] Commit archive with message referencing the tags
+- [ ] Verify no confusion: only `sprint_lifecycle.py` (facade) exists in scripts/
+
+**Recovery Path**: If rollback needed, checkout `pre-modular-refactor` tag
+
+### Phase 10: Documentation (1 hour)
 - [ ] Update `docs/AUTOMATION_USAGE.md` with new architecture
 - [ ] Add architecture diagram
 - [ ] Document module responsibilities
@@ -247,6 +283,7 @@ from sprint_automation import *
 
 ## Acceptance Criteria
 
+- [ ] Dead code removed and documented (Phase 0 complete)
 - [ ] All 144 existing tests passing
 - [ ] Test coverage ≥84% (maintain or improve)
 - [ ] All 19 CLI commands produce identical output (v1 vs v2)
@@ -255,6 +292,10 @@ from sprint_automation import *
 - [ ] Documentation updated
 - [ ] Comparison tests validate equivalence
 - [ ] Zero test failures after cutover
+- [ ] Original file untouched until cutover (build-then-cutover verified)
+- [ ] Git tags created: `pre-modular-refactor` and `post-modular-refactor`
+- [ ] Old monolith archived to `docs/archive/` with README
+- [ ] No duplicate/confusing files left in `scripts/` directory
 
 ## Open Questions
 
@@ -263,7 +304,7 @@ None - architecture design complete, implementation plan validated.
 ## Notes
 
 **Priority**: High (technical debt reduction, enables future Epic 01 work)
-**Estimated Effort**: 12-17.5 hours
+**Estimated Effort**: 14-20 hours (includes Phase 0 cleanup and Phase 9 archive)
 **Success Metric**: Reduce largest module from 3,325 lines to <600 lines
 
 **Refactoring Benefits**:
@@ -275,7 +316,8 @@ None - architecture design complete, implementation plan validated.
 **Risk Mitigation**:
 - Parallel build (no risk to production)
 - Comparison testing (validates equivalence)
-- Atomic cutover (instant rollback if needed)
+- Git tags for instant rollback (`pre-modular-refactor`)
 - High test coverage (84% catches regressions)
+- Archive preserves old code without cluttering codebase
 
 **Source**: Refactoring plan from conversation after Sprint 2 completion
