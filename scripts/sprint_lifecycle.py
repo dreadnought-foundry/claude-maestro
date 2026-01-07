@@ -1877,7 +1877,10 @@ def complete_epic(epic_num: int, dry_run: bool = False) -> dict:
     title = title_match.group(1).strip().strip('"') if title_match else "Unknown"
 
     # Check all sprints are finished
-    sprint_files = list(epic_folder.glob("**/sprint-*.md"))
+    # Exclude postmortem files (they're metadata, not sprints)
+    sprint_files = [
+        f for f in epic_folder.glob("**/sprint-*.md") if "_postmortem" not in f.name
+    ]
     done_sprints = []
     aborted_sprints = []
     unfinished_sprints = []
@@ -1885,11 +1888,13 @@ def complete_epic(epic_num: int, dry_run: bool = False) -> dict:
 
     for sprint_file in sprint_files:
         name = sprint_file.name
-        if "--done" in name:
+        # Check both file name and parent directory for status suffix
+        parent_name = sprint_file.parent.name
+        if "--done" in name or "--done" in parent_name:
             done_sprints.append(name)
-        elif "--aborted" in name:
+        elif "--aborted" in name or "--aborted" in parent_name:
             aborted_sprints.append(name)
-        elif "--blocked" in name:
+        elif "--blocked" in name or "--blocked" in parent_name:
             blocked_sprints.append(name)
         else:
             unfinished_sprints.append(name)
