@@ -1,3 +1,17 @@
+---
+sprint: 1
+title: "Discoverability Dashboard"
+epic: 1
+status: done
+created: 2026-01-06T21:01:11Z
+started: 2026-01-06T21:01:11Z
+completed: 2026-01-06
+hours: null
+workflow_version: "3.1.0"
+
+
+---
+
 # Sprint 1: Discoverability Dashboard
 
 ## Overview

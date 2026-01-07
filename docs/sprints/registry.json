@@ -39,6 +39,11 @@
       "status": "aborted",
       "abort_reason": "Demo complete - automation validated by subsequent sprints",
       "hours": 0
+    },
+    "1": {
+      "status": "done",
+      "completed": "2026-01-06",
+      "hours": 8.1
     }
   },
   "epics": {
