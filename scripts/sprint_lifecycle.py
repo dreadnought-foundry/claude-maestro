@@ -725,6 +725,527 @@ Created: {today}
     return {"sprint_dir": str(sprint_dir), "sprint_file": str(sprint_file)}
 
 
+def import_sprint(
+    source_path: str,
+    sprint_type: str = "fullstack",
+    epic: Optional[int] = None,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Import an existing sketch/draft sprint file into proper Maestro format.
+
+    Takes a simple markdown file (with or without frontmatter) and:
+    - Auto-assigns a sprint number from registry
+    - Creates proper directory structure
+    - Adds/completes YAML frontmatter
+    - Preserves original content
+    - Registers in registry.json
+
+    Args:
+        source_path: Path to the existing sprint markdown file
+        sprint_type: One of: fullstack, backend, frontend, research, spike, infrastructure
+        epic: Optional epic number this sprint belongs to
+        dry_run: If True, preview without creating
+
+    Returns:
+        Dict with import details
+
+    Example:
+        >>> import_sprint("sketches/my-feature.md", epic=1)
+        >>> import_sprint("./user-auth.md", sprint_type="backend")
+    """
+    import yaml
+
+    project_root = find_project_root()
+    source = Path(source_path)
+
+    # Resolve relative paths
+    if not source.is_absolute():
+        source = project_root / source
+
+    if not source.exists():
+        raise ValidationError(f"Source file not found: {source}")
+
+    # Read source file
+    with open(source) as f:
+        content = f.read()
+
+    # Parse existing frontmatter if present
+    existing_frontmatter = {}
+    body_content = content
+
+    if content.startswith("---"):
+        parts = content.split("---", 2)
+        if len(parts) >= 3:
+            try:
+                existing_frontmatter = yaml.safe_load(parts[1]) or {}
+                body_content = parts[2].strip()
+            except yaml.YAMLError:
+                # Invalid YAML, treat whole file as content
+                pass
+
+    # Extract title from content or filename
+    title = None
+
+    # Priority 1: From existing frontmatter
+    if "title" in existing_frontmatter:
+        title = existing_frontmatter["title"]
+
+    # Priority 2: From first heading
+    if not title:
+        for line in body_content.split("\n"):
+            line = line.strip()
+            if line.startswith("# "):
+                # Handle "# Sprint N: Title" format
+                heading = line[2:].strip()
+                if ":" in heading and heading.lower().startswith("sprint"):
+                    title = heading.split(":", 1)[1].strip()
+                else:
+                    title = heading
+                break
+
+    # Priority 3: From filename
+    if not title:
+        title = source.stem.replace("-", " ").replace("_", " ").title()
+        # Remove "sprint" prefix if present
+        if title.lower().startswith("sprint"):
+            title = title[6:].strip()
+            # Remove number prefix if present (e.g., "01 " or "1 ")
+            if title and title[0].isdigit():
+                title = re.sub(r"^\d+\s*", "", title)
+
+    if not title:
+        raise ValidationError(f"Could not extract title from {source}")
+
+    # Get next sprint number
+    sprint_num = get_next_sprint_number(dry_run=dry_run)
+
+    # Create slug from title
+    slug = title.lower()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"\s+", "-", slug)
+    slug = slug.strip("-")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Determine destination folder
+    if epic:
+        # Find epic folder
+        epic_folder = None
+        for status_dir in ["0-backlog", "1-todo", "2-in-progress"]:
+            search_path = project_root / "docs" / "sprints" / status_dir
+            if search_path.exists():
+                for folder in search_path.glob(f"epic-{epic:02d}_*"):
+                    if folder.is_dir():
+                        epic_folder = folder
+                        break
+                # Also try single-digit epic pattern
+                if not epic_folder:
+                    for folder in search_path.glob(f"epic-{epic}_*"):
+                        if folder.is_dir():
+                            epic_folder = folder
+                            break
+            if epic_folder:
+                break
+
+        if not epic_folder:
+            raise ValidationError(
+                f"Epic {epic} folder not found. Create it first with /epic-new."
+            )
+
+        sprint_dir = epic_folder / f"sprint-{sprint_num:02d}_{slug}"
+    else:
+        # Standalone sprint in backlog
+        sprint_dir = (
+            project_root
+            / "docs"
+            / "sprints"
+            / "0-backlog"
+            / f"sprint-{sprint_num:02d}_{slug}"
+        )
+
+    sprint_file = sprint_dir / f"sprint-{sprint_num:02d}_{slug}.md"
+
+    if dry_run:
+        print(f"[DRY RUN] Would import sprint from: {source}")
+        print(f"  Sprint Number: {sprint_num}")
+        print(f"  Title: {title}")
+        print(f"  Type: {sprint_type}")
+        print(f"  Epic: {epic or 'None (standalone)'}")
+        print(f"  Destination: {sprint_dir.relative_to(project_root)}")
+        print(f"\nNo changes made.")
+        return {
+            "sprint_num": sprint_num,
+            "title": title,
+            "source": str(source),
+            "destination": str(sprint_dir),
+        }
+
+    # Create folder
+    sprint_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build new frontmatter (merge with existing)
+    new_frontmatter = {
+        "sprint": sprint_num,
+        "title": title,
+        "type": sprint_type,
+        "epic": epic if epic else None,
+        "status": "planning",
+        "created": existing_frontmatter.get("created", today_iso),
+        "started": existing_frontmatter.get("started"),
+        "completed": existing_frontmatter.get("completed"),
+        "hours": existing_frontmatter.get("hours"),
+        "workflow_version": "3.1.0",
+    }
+
+    # Preserve any custom fields from original frontmatter
+    for key, value in existing_frontmatter.items():
+        if key not in new_frontmatter:
+            new_frontmatter[key] = value
+
+    # Update body content heading if needed
+    lines = body_content.split("\n")
+    new_lines = []
+    heading_updated = False
+
+    for line in lines:
+        if not heading_updated and line.strip().startswith("# "):
+            # Replace first heading with proper format
+            new_lines.append(f"# Sprint {sprint_num}: {title}")
+            heading_updated = True
+        else:
+            new_lines.append(line)
+
+    # If no heading found, add one
+    if not heading_updated:
+        new_lines.insert(0, f"# Sprint {sprint_num}: {title}")
+        new_lines.insert(1, "")
+
+    updated_body = "\n".join(new_lines)
+
+    # Build final content
+    frontmatter_str = yaml.dump(new_frontmatter, default_flow_style=False, sort_keys=False)
+    sprint_content = f"---\n{frontmatter_str}---\n\n{updated_body}"
+
+    # Write new file
+    with open(sprint_file, "w") as f:
+        f.write(sprint_content)
+
+    # Register in registry
+    registry_path = project_root / "docs" / "sprints" / "registry.json"
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    sprint_key = str(sprint_num)
+    if "sprints" not in registry:
+        registry["sprints"] = {}
+
+    registry["sprints"][sprint_key] = {
+        "title": title,
+        "status": "planning",
+        "epic": epic,
+        "type": sprint_type,
+        "created": today,
+        "started": None,
+        "completed": None,
+        "hours": None,
+    }
+
+    # Update nextSprintNumber
+    if registry.get("nextSprintNumber", 1) <= sprint_num:
+        registry["nextSprintNumber"] = sprint_num + 1
+
+    # Also update counters if present
+    if "counters" in registry:
+        if registry["counters"].get("next_sprint", 1) <= sprint_num:
+            registry["counters"]["next_sprint"] = sprint_num + 1
+
+    with open(registry_path, "w") as f:
+        json.dump(registry, f, indent=2)
+
+    # Update epic's totalSprints count
+    if epic:
+        epic_key = str(epic)
+        if epic_key in registry.get("epics", {}):
+            registry["epics"][epic_key]["totalSprints"] = (
+                registry["epics"][epic_key].get("totalSprints", 0) + 1
+            )
+            with open(registry_path, "w") as f:
+                json.dump(registry, f, indent=2)
+
+    print(f"✓ Imported sprint from: {source.name}")
+    print(f"  Sprint Number: {sprint_num}")
+    print(f"  Title: {title}")
+    print(f"  Type: {sprint_type}")
+    print(f"  Epic: {epic or 'None (standalone)'}")
+    print(f"  New Location: {sprint_dir.relative_to(project_root)}/")
+    print(f"\nNext steps:")
+    print(f"  1. Review the imported sprint: {sprint_file.relative_to(project_root)}")
+    print(f"  2. Fill in any missing sections")
+    print(f"  3. Run /sprint-start {sprint_num} when ready")
+
+    return {
+        "sprint_num": sprint_num,
+        "title": title,
+        "source": str(source),
+        "sprint_dir": str(sprint_dir),
+        "sprint_file": str(sprint_file),
+    }
+
+
+def import_epic(
+    source_path: str,
+    sprint_type: str = "fullstack",
+    dry_run: bool = False,
+) -> dict:
+    """
+    Import a sketch epic directory with all its sprint files into proper Maestro format.
+
+    Takes a directory containing sprint markdown files (or an _epic.md file) and:
+    - Auto-assigns an epic number from registry
+    - Creates proper epic directory structure
+    - Imports all sprint files found within
+    - Adds/completes YAML frontmatter for epic and sprints
+    - Registers epic and all sprints in registry.json
+
+    Args:
+        source_path: Path to source epic directory or _epic.md file
+        sprint_type: Default sprint type for imported sprints
+        dry_run: If True, preview without creating
+
+    Returns:
+        Dict with import details
+
+    Example:
+        >>> import_epic("sketches/user-management/")
+        >>> import_epic("./my-epic/_epic.md", sprint_type="backend")
+    """
+    import yaml
+
+    project_root = find_project_root()
+    source = Path(source_path)
+
+    # Resolve relative paths
+    if not source.is_absolute():
+        source = project_root / source
+
+    # Determine if source is a file or directory
+    if source.is_file():
+        source_dir = source.parent
+        epic_file = source if source.name == "_epic.md" else None
+    elif source.is_dir():
+        source_dir = source
+        epic_file = source / "_epic.md" if (source / "_epic.md").exists() else None
+    else:
+        raise ValidationError(f"Source not found: {source}")
+
+    # Extract epic title
+    epic_title = None
+    existing_epic_frontmatter = {}
+
+    if epic_file and epic_file.exists():
+        with open(epic_file) as f:
+            content = f.read()
+
+        # Parse frontmatter
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                try:
+                    existing_epic_frontmatter = yaml.safe_load(parts[1]) or {}
+                except yaml.YAMLError:
+                    pass
+
+        # Get title from frontmatter or first heading
+        if "title" in existing_epic_frontmatter:
+            epic_title = existing_epic_frontmatter["title"]
+        else:
+            for line in content.split("\n"):
+                if line.startswith("# "):
+                    heading = line[2:].strip()
+                    # Handle "# Epic N: Title" format
+                    if ":" in heading and heading.lower().startswith("epic"):
+                        epic_title = heading.split(":", 1)[1].strip()
+                    else:
+                        epic_title = heading
+                    break
+
+    # Fallback to directory name
+    if not epic_title:
+        epic_title = source_dir.name.replace("-", " ").replace("_", " ").title()
+        # Remove "epic" prefix if present
+        if epic_title.lower().startswith("epic"):
+            epic_title = epic_title[4:].strip()
+            # Remove number prefix if present
+            if epic_title and epic_title[0].isdigit():
+                epic_title = re.sub(r"^\d+\s*", "", epic_title)
+
+    if not epic_title:
+        raise ValidationError(f"Could not extract epic title from {source}")
+
+    # Find all sprint files in source directory
+    sprint_files = []
+    for pattern in ["*.md", "**/*.md"]:
+        for f in source_dir.glob(pattern):
+            if f.name != "_epic.md" and f.is_file():
+                sprint_files.append(f)
+
+    # Deduplicate
+    sprint_files = list(set(sprint_files))
+    sprint_files.sort(key=lambda x: x.name)
+
+    # Get next epic number
+    epic_num = get_next_epic_number(dry_run=dry_run)
+
+    # Create slug from title
+    slug = epic_title.lower()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"\s+", "-", slug)
+    slug = slug.strip("-")
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Epic destination
+    epic_dir = project_root / "docs" / "sprints" / "0-backlog" / f"epic-{epic_num:02d}_{slug}"
+    epic_md_file = epic_dir / "_epic.md"
+
+    if dry_run:
+        print(f"[DRY RUN] Would import epic from: {source_dir}")
+        print(f"  Epic Number: {epic_num}")
+        print(f"  Title: {epic_title}")
+        print(f"  Destination: {epic_dir.relative_to(project_root)}")
+        print(f"  Sprint files found: {len(sprint_files)}")
+        for sf in sprint_files:
+            print(f"    - {sf.name}")
+        print(f"\nNo changes made.")
+        return {
+            "epic_num": epic_num,
+            "title": epic_title,
+            "source": str(source_dir),
+            "destination": str(epic_dir),
+            "sprint_count": len(sprint_files),
+        }
+
+    # Create epic directory
+    epic_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create or update epic file
+    epic_frontmatter = {
+        "epic": epic_num,
+        "title": epic_title,
+        "status": "backlog",
+        "created": existing_epic_frontmatter.get("created", today_iso),
+        "started": existing_epic_frontmatter.get("started"),
+        "completed": existing_epic_frontmatter.get("completed"),
+    }
+
+    # Preserve custom fields
+    for key, value in existing_epic_frontmatter.items():
+        if key not in epic_frontmatter:
+            epic_frontmatter[key] = value
+
+    # Read original epic content if exists
+    epic_body = ""
+    if epic_file and epic_file.exists():
+        with open(epic_file) as f:
+            content = f.read()
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                epic_body = parts[2].strip()
+        else:
+            epic_body = content
+
+    # Update heading in body
+    lines = epic_body.split("\n") if epic_body else []
+    new_lines = []
+    heading_updated = False
+    for line in lines:
+        if not heading_updated and line.strip().startswith("# "):
+            new_lines.append(f"# Epic {epic_num:02d}: {epic_title}")
+            heading_updated = True
+        else:
+            new_lines.append(line)
+
+    if not heading_updated:
+        new_lines.insert(0, f"# Epic {epic_num:02d}: {epic_title}")
+        new_lines.insert(1, "")
+
+    updated_epic_body = "\n".join(new_lines)
+
+    # Build epic file content
+    frontmatter_str = yaml.dump(epic_frontmatter, default_flow_style=False, sort_keys=False)
+    epic_content = f"---\n{frontmatter_str}---\n\n{updated_epic_body}"
+
+    with open(epic_md_file, "w") as f:
+        f.write(epic_content)
+
+    # Register epic in registry
+    registry_path = project_root / "docs" / "sprints" / "registry.json"
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    if "epics" not in registry:
+        registry["epics"] = {}
+
+    epic_key = str(epic_num)
+    registry["epics"][epic_key] = {
+        "title": epic_title,
+        "status": "backlog",
+        "created": today,
+        "started": None,
+        "completed": None,
+        "totalSprints": len(sprint_files),
+        "completedSprints": 0,
+    }
+
+    # Update nextEpicNumber
+    if registry.get("nextEpicNumber", 1) <= epic_num:
+        registry["nextEpicNumber"] = epic_num + 1
+
+    if "counters" in registry:
+        if registry["counters"].get("next_epic", 1) <= epic_num:
+            registry["counters"]["next_epic"] = epic_num + 1
+
+    with open(registry_path, "w") as f:
+        json.dump(registry, f, indent=2)
+
+    # Import all sprint files into the epic
+    imported_sprints = []
+    for sprint_file in sprint_files:
+        try:
+            result = import_sprint(
+                str(sprint_file),
+                sprint_type=sprint_type,
+                epic=epic_num,
+                dry_run=False,
+            )
+            imported_sprints.append(result)
+        except Exception as e:
+            print(f"  Warning: Could not import {sprint_file.name}: {e}")
+
+    print(f"\n✓ Imported epic from: {source_dir.name}")
+    print(f"  Epic Number: {epic_num}")
+    print(f"  Title: {epic_title}")
+    print(f"  New Location: {epic_dir.relative_to(project_root)}/")
+    print(f"  Sprints Imported: {len(imported_sprints)}/{len(sprint_files)}")
+    print(f"\nNext steps:")
+    print(f"  1. Review the imported epic: {epic_md_file.relative_to(project_root)}")
+    print(f"  2. Run /epic-start {epic_num} to begin work")
+
+    return {
+        "epic_num": epic_num,
+        "title": epic_title,
+        "source": str(source_dir),
+        "epic_dir": str(epic_dir),
+        "epic_file": str(epic_md_file),
+        "sprints_imported": len(imported_sprints),
+        "sprints": imported_sprints,
+    }
+
+
 def register_new_sprint(
     title: str, epic: Optional[int] = None, dry_run: bool = False, **metadata
 ) -> int:
@@ -3882,6 +4403,57 @@ def main():
         "--dry-run", action="store_true", help="Preview without executing"
     )
 
+    # import-sprint command
+    import_sprint_parser = subparsers.add_parser(
+        "import-sprint", help="Import sketch sprint file into proper Maestro format"
+    )
+    import_sprint_parser.add_argument("source_path", help="Path to source sprint file")
+    import_sprint_parser.add_argument(
+        "--type",
+        dest="sprint_type",
+        default="fullstack",
+        choices=[
+            "fullstack",
+            "backend",
+            "frontend",
+            "research",
+            "spike",
+            "infrastructure",
+        ],
+        help="Sprint type (default: fullstack)",
+    )
+    import_sprint_parser.add_argument(
+        "--epic", type=int, help="Epic number (optional)"
+    )
+    import_sprint_parser.add_argument(
+        "--dry-run", action="store_true", help="Preview without executing"
+    )
+
+    # import-epic command
+    import_epic_parser = subparsers.add_parser(
+        "import-epic", help="Import sketch epic directory with all sprint files"
+    )
+    import_epic_parser.add_argument(
+        "source_path", help="Path to source epic directory or _epic.md file"
+    )
+    import_epic_parser.add_argument(
+        "--type",
+        dest="sprint_type",
+        default="fullstack",
+        choices=[
+            "fullstack",
+            "backend",
+            "frontend",
+            "research",
+            "spike",
+            "infrastructure",
+        ],
+        help="Default sprint type for imported sprints (default: fullstack)",
+    )
+    import_epic_parser.add_argument(
+        "--dry-run", action="store_true", help="Preview without executing"
+    )
+
     # === COMPLETION COMMANDS ===
 
     # complete-sprint command
@@ -4108,6 +4680,23 @@ def main():
                 args.title,
                 sprint_type=args.sprint_type,
                 epic=args.epic,
+                dry_run=args.dry_run,
+            )
+            # Output handled by function
+
+        elif args.command == "import-sprint":
+            result = import_sprint(
+                args.source_path,
+                sprint_type=args.sprint_type,
+                epic=args.epic,
+                dry_run=args.dry_run,
+            )
+            # Output handled by function
+
+        elif args.command == "import-epic":
+            result = import_epic(
+                args.source_path,
+                sprint_type=args.sprint_type,
                 dry_run=args.dry_run,
             )
             # Output handled by function
