@@ -3710,28 +3710,66 @@ def add_to_epic(sprint_num: int, epic_num: int, dry_run: bool = False) -> dict:
         if title_match:
             sprint_title = title_match.group(1).strip().strip('"')
 
-    new_path = epic_folder / sprint_file.name
+    # Determine if sprint is in a directory or standalone file
+    sprint_dir = sprint_file.parent
+    sprint_dir_name = sprint_dir.name
+
+    # Check if sprint file is in its own directory (e.g., sprint-07_title/sprint-07_title.md)
+    # vs being a standalone file
+    is_in_sprint_dir = sprint_dir_name.startswith(f"sprint-{sprint_num:02d}_") or sprint_dir_name.startswith(f"sprint-{sprint_num}_")
+
+    if is_in_sprint_dir:
+        # Move entire directory
+        new_dir_path = epic_folder / sprint_dir_name
+        new_file_path = new_dir_path / sprint_file.name
+    else:
+        # Standalone file - just move the file
+        new_dir_path = None
+        new_file_path = epic_folder / sprint_file.name
 
     if dry_run:
         print(f"[DRY RUN] Would add sprint {sprint_num} to epic {epic_num}:")
         print(f"  Sprint: {sprint_title}")
         print(f"  Epic: {epic_title}")
-        print(f"  Move to: {new_path}")
+        if is_in_sprint_dir:
+            print(f"  Move directory: {sprint_dir}")
+            print(f"  To: {new_dir_path}")
+        else:
+            print(f"  Move file: {sprint_file}")
+            print(f"  To: {new_file_path}")
         print(f"  Update YAML: epic={epic_num}")
         return {"status": "dry-run", "sprint_num": sprint_num, "epic_num": epic_num}
 
-    # Move sprint file
-    sprint_file.rename(new_path)
+    # Move sprint directory or file
+    import shutil
+    if is_in_sprint_dir:
+        shutil.move(str(sprint_dir), str(new_dir_path))
+    else:
+        sprint_file.rename(new_file_path)
 
     # Update sprint YAML
-    _update_yaml_frontmatter(new_path, {"epic": epic_num})
+    _update_yaml_frontmatter(new_file_path, {"epic": epic_num})
+
+    # Update registry with new file path
+    registry_path = project_root / "docs" / "sprints" / "registry.json"
+    if registry_path.exists():
+        with open(registry_path) as f:
+            registry = json.load(f)
+
+        sprint_key = str(sprint_num)
+        if sprint_key in registry.get("sprints", {}):
+            registry["sprints"][sprint_key]["epic"] = epic_num
+            registry["sprints"][sprint_key]["file"] = str(new_file_path.relative_to(project_root))
+
+            with open(registry_path, "w") as f:
+                json.dump(registry, f, indent=2)
 
     summary = {
         "sprint_num": sprint_num,
         "sprint_title": sprint_title,
         "epic_num": epic_num,
         "epic_title": epic_title,
-        "new_path": str(new_path),
+        "new_path": str(new_file_path),
     }
 
     print(f"\n{'='*60}")
@@ -3739,7 +3777,7 @@ def add_to_epic(sprint_num: int, epic_num: int, dry_run: bool = False) -> dict:
     print(f"{'='*60}")
     print(f"Sprint: {sprint_title}")
     print(f"Epic: {epic_title}")
-    print(f"New location: {new_path}")
+    print(f"New location: {new_file_path}")
     print(f"{'='*60}")
 
     return summary
