@@ -10,7 +10,7 @@ allowed-tools: [Bash]
 ## Run Automation
 
 ```bash
-python3 scripts/sprint_lifecycle.py complete-sprint $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py complete-sprint $ARGUMENTS
 ```
 
 This single command handles ALL completion steps automatically:

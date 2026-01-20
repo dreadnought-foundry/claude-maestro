@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the epic-status automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py epic-status $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py epic-status $ARGUMENTS
 ```
 
 This command displays:

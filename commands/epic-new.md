@@ -29,7 +29,7 @@ SPRINT_COUNT="$SPRINT_COUNT"  # Optional, how many sprints planned
 ESTIMATED_HOURS="$ESTIMATED_HOURS"  # Optional
 
 # Register epic and get assigned number
-EPIC_NUM=$(python3 scripts/sprint_lifecycle.py register-epic "$TITLE" --sprint-count ${SPRINT_COUNT:-0} --estimated-hours ${ESTIMATED_HOURS:-0} 2>&1 | grep "Registered epic" | awk '{print $3}')
+EPIC_NUM=$(python3 ~/.claude/scripts/sprint_lifecycle.py register-epic "$TITLE" --sprint-count ${SPRINT_COUNT:-0} --estimated-hours ${ESTIMATED_HOURS:-0} 2>&1 | grep "Registered epic" | awk '{print $3}')
 
 echo "✓ Epic $EPIC_NUM registered: $TITLE"
 ```

@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the abort-sprint automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py abort-sprint $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py abort-sprint $ARGUMENTS
 ```
 
 This command handles all abort steps:

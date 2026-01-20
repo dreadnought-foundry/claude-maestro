@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the add-to-epic automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py add-to-epic $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py add-to-epic $ARGUMENTS
 ```
 
 This command handles:

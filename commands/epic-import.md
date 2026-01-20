@@ -37,7 +37,7 @@ Extract from $ARGUMENTS:
 ### 2. Run Import Automation
 
 ```bash
-python3 scripts/sprint_lifecycle.py import-epic "$SOURCE_PATH" \
+python3 ~/.claude/scripts/sprint_lifecycle.py import-epic "$SOURCE_PATH" \
   ${TYPE:+--type $TYPE} \
   ${DRY_RUN:+--dry-run}
 ```

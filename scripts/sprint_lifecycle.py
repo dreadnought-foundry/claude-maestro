@@ -378,6 +378,9 @@ def get_next_sprint_number(dry_run: bool = False) -> int:
     """
     Get next available sprint number and increment counter in registry.
 
+    Uses counters.next_sprint field, and validates against existing sprints
+    to prevent collisions.
+
     Args:
         dry_run: If True, return next number without incrementing
 
@@ -398,22 +401,34 @@ def get_next_sprint_number(dry_run: bool = False) -> int:
             registry = json.load(f)
     else:
         registry = {
-            "version": "1.0",
-            "nextSprintNumber": 1,
-            "nextEpicNumber": 1,
+            "counters": {"next_sprint": 1, "next_epic": 1},
             "sprints": {},
             "epics": {},
         }
 
-    next_num = registry.get("nextSprintNumber", 1)
+    # Get counter from counters.next_sprint (preferred) or legacy nextSprintNumber
+    if "counters" in registry and "next_sprint" in registry["counters"]:
+        next_num = registry["counters"]["next_sprint"]
+    else:
+        next_num = registry.get("nextSprintNumber", 1)
+
+    # Validate: ensure this number doesn't already exist in sprints
+    existing_sprints = registry.get("sprints", {})
+    while str(next_num) in existing_sprints:
+        next_num += 1
 
     if dry_run:
-        print(f"[DRY RUN] Next sprint number: {next_num}")
-        print(f"[DRY RUN] Would increment to: {next_num + 1}")
+        print(f"✓ Next sprint number: {next_num}")
+        print(f"✓ Counter incremented to: {next_num + 1}")
         return next_num
 
-    # Increment counter
-    registry["nextSprintNumber"] = next_num + 1
+    # Increment counter in both locations for compatibility
+    if "counters" not in registry:
+        registry["counters"] = {}
+    registry["counters"]["next_sprint"] = next_num + 1
+    # Also update legacy field if it exists
+    if "nextSprintNumber" in registry:
+        registry["nextSprintNumber"] = next_num + 1
 
     # Save registry
     backup = None
@@ -1250,13 +1265,18 @@ def register_new_sprint(
     title: str, epic: Optional[int] = None, dry_run: bool = False, **metadata
 ) -> int:
     """
-    Register a new sprint in registry with auto-assigned number.
+    Register a new sprint in registry with auto-assigned number AND create sprint files.
+
+    This function:
+    1. Gets next available sprint number (validates no collision)
+    2. Creates sprint folder and markdown file
+    3. Registers in registry.json
 
     Args:
         title: Sprint title
         epic: Optional epic number this sprint belongs to
         dry_run: If True, show what would be registered
-        **metadata: Additional metadata (estimatedHours, created, etc.)
+        **metadata: Additional metadata (estimatedHours, type, etc.)
 
     Returns:
         Assigned sprint number
@@ -1266,8 +1286,20 @@ def register_new_sprint(
         >>> print(sprint_num)
         6
     """
-    # Get next sprint number
+    project_root = find_project_root()
+    registry_path = project_root / "docs" / "sprints" / "registry.json"
+
+    # Load registry first to check for conflicts
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    # Get next sprint number (this validates against existing sprints)
     sprint_num = get_next_sprint_number(dry_run=dry_run)
+
+    # Double-check sprint doesn't exist (defensive)
+    sprint_key = str(sprint_num)
+    if sprint_key in registry.get("sprints", {}):
+        raise ValidationError(f"Sprint {sprint_num} already exists in registry")
 
     if dry_run:
         print(f"[DRY RUN] Would register sprint {sprint_num}:")
@@ -1277,43 +1309,17 @@ def register_new_sprint(
             print(f"  {key}: {value}")
         return sprint_num
 
-    project_root = find_project_root()
-    registry_path = project_root / "docs" / "sprints" / "registry.json"
+    # Get sprint type from metadata, default to fullstack
+    sprint_type = metadata.pop("type", "fullstack")
 
-    # Load registry
-    with open(registry_path) as f:
-        registry = json.load(f)
-
-    # Ensure structure exists
-    if "sprints" not in registry:
-        registry["sprints"] = {}
-
-    # Register sprint
-    sprint_key = str(sprint_num)
-    registry["sprints"][sprint_key] = {
-        "title": title,
-        "status": "planning",
-        "epic": epic,
-        "created": datetime.now().strftime("%Y-%m-%d"),
-        "started": None,
-        "completed": None,
-        "hours": None,
-        **metadata,
-    }
-
-    # Save registry
-    backup = _backup_file(registry_path)
-
+    # Create sprint folder and file using create_sprint
     try:
-        with open(registry_path, "w") as f:
-            json.dump(registry, f, indent=2)
-
-        _cleanup_backup(backup)
-
+        create_sprint(sprint_num, title, sprint_type=sprint_type, epic=epic, dry_run=False)
+        print(f"✓ Registered sprint {sprint_num}: {title}")
+        if epic:
+            print(f"  Part of Epic {epic}")
         return sprint_num
-
     except Exception as e:
-        _restore_file(backup)
         raise FileOperationError(f"Failed to register sprint: {e}") from e
 
 

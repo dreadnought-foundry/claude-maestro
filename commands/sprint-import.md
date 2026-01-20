@@ -61,7 +61,7 @@ Read the source file and extract:
 ### 4. Run Import Automation
 
 ```bash
-python3 scripts/sprint_lifecycle.py import-sprint "$FILE_PATH" \
+python3 ~/.claude/scripts/sprint_lifecycle.py import-sprint "$FILE_PATH" \
   ${EPIC:+--epic $EPIC} \
   ${TYPE:+--type $TYPE} \
   ${DRY_RUN:+--dry-run}

@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the list-epics automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py list-epics
+python3 ~/.claude/scripts/sprint_lifecycle.py list-epics
 ```
 
 This command displays:

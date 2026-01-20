@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the recover-sprint automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py recover-sprint $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py recover-sprint $ARGUMENTS
 ```
 
 This command handles:

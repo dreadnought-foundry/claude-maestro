@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the archive-epic automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py archive-epic $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py archive-epic $ARGUMENTS
 ```
 
 This command handles all archiving steps:

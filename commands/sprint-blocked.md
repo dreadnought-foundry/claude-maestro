@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the block-sprint automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py block-sprint $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py block-sprint $ARGUMENTS
 ```
 
 This command handles all blocking steps:

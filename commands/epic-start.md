@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the start-epic automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py start-epic $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py start-epic $ARGUMENTS
 ```
 
 This command handles all startup steps:

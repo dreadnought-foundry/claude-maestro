@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the complete-epic automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py complete-epic $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py complete-epic $ARGUMENTS
 ```
 
 This command handles all completion steps:

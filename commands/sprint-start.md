@@ -16,7 +16,7 @@ This command starts a sprint and automatically executes the workflow through imp
 Run the start-sprint automation:
 
 ```bash
-python3 scripts/sprint_lifecycle.py start-sprint $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py start-sprint $ARGUMENTS
 ```
 
 If sprint is already started, continue from current step.
@@ -26,7 +26,7 @@ If sprint is already started, continue from current step.
 **Step 1.1 - Read Sprint File:**
 - Read the sprint file from the state
 - Understand requirements, scope, and technical approach
-- Advance step: `python3 scripts/sprint_lifecycle.py advance-step $ARGUMENTS`
+- Advance step: `python3 ~/.claude/scripts/sprint_lifecycle.py advance-step $ARGUMENTS`
 
 **Step 1.2 - Spawn Plan Agent:**
 - Use Task tool with subagent_type="Plan" to design implementation
@@ -100,7 +100,7 @@ DO NOT execute Phase 6 steps. User controls completion.
 
 For each step:
 1. Execute the step's work (agent, validation, etc.)
-2. Run `python3 scripts/sprint_lifecycle.py advance-step $ARGUMENTS`
+2. Run `python3 ~/.claude/scripts/sprint_lifecycle.py advance-step $ARGUMENTS`
 3. Continue to next step (unless at 1.3 pause or 5.2 stop)
 
 ## Error Handling

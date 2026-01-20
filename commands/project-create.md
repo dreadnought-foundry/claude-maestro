@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the create-project automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py create-project $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py create-project $ARGUMENTS
 ```
 
 ## Dual-Mode Operation
@@ -29,7 +29,7 @@ When running in claude-maestro repository:
 
 When running in a regular project:
 - Copies FROM `~/.claude/templates/project/` TO `./.claude/`
-- Includes commands/ and scripts/ for automation
+- Uses central commands and scripts from `~/.claude/`
 - Standard project setup
 
 **Usage:**
@@ -50,8 +50,8 @@ When running in a regular project:
 
 | Component | Source | Destination |
 |-----------|--------|-------------|
-| Commands | `~/Development/Dreadnought/claude-maestro/commands/` | `./commands/` |
-| Scripts | `~/Development/Dreadnought/claude-maestro/scripts/` | `./scripts/` |
+| Commands | `~/.claude/commands/` | Used centrally (not copied) |
+| Scripts | `~/.claude/scripts/` | Used centrally (not copied) |
 | Global Agents | `~/.claude/agents/` | `.claude/agents/` |
 | Project Agents | `~/.claude/templates/project/.claude/agents/` | `.claude/agents/` |
 | Global Hooks | `~/.claude/hooks/` | `.claude/hooks/` |
@@ -72,7 +72,7 @@ When running in a regular project:
 
 **Prerequisites:**
 - Target directory must exist
-- **Normal mode**: Master project at `~/Development/Dreadnought/claude-maestro`
+- **Normal mode**: Maestro installed globally (run `./install.sh` from claude-maestro repo)
 - **Maestro mode**: `templates/project/` directory exists
 
 **Next Steps After Creation:**

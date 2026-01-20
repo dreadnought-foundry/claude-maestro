@@ -8,7 +8,7 @@ allowed-tools: [Bash]
 Run the generate-postmortem automation command:
 
 ```bash
-python3 scripts/sprint_lifecycle.py generate-postmortem $ARGUMENTS
+python3 ~/.claude/scripts/sprint_lifecycle.py generate-postmortem $ARGUMENTS
 ```
 
 This command creates a **separate postmortem file** linked from the sprint file.

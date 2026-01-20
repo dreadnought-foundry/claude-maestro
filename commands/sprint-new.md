@@ -28,7 +28,7 @@ Parse $ARGUMENTS:
 **Auto-number workflow:**
 ```bash
 # Get next sprint number from automation
-SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py next-sprint-number --dry-run | grep "Next sprint number" | awk '{print $4}')
+SPRINT_NUM=$(python3 ~/.claude/scripts/sprint_lifecycle.py next-sprint-number --dry-run | grep "Next sprint number" | awk '{print $4}')
 echo "Auto-assigned sprint number: $SPRINT_NUM"
 ```
 
@@ -45,9 +45,9 @@ EPIC="$EPIC"    # Optional, parsed from --epic=N
 
 # Register sprint and get assigned number
 if [ -n "$EPIC" ]; then
-  SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py register-sprint "$TITLE" --epic $EPIC --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
+  SPRINT_NUM=$(python3 ~/.claude/scripts/sprint_lifecycle.py register-sprint "$TITLE" --epic $EPIC --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
 else
-  SPRINT_NUM=$(python3 scripts/sprint_lifecycle.py register-sprint "$TITLE" --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
+  SPRINT_NUM=$(python3 ~/.claude/scripts/sprint_lifecycle.py register-sprint "$TITLE" --estimated-hours $HOURS 2>&1 | grep "Registered sprint" | awk '{print $3}')
 fi
 
 echo "✓ Sprint $SPRINT_NUM registered: $TITLE"

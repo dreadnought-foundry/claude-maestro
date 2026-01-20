@@ -71,6 +71,37 @@ For a project to use this workflow, it needs:
 - Cannot complete without all checklist items passing
 - Every step recorded with timestamp for audit trail
 
+### CRITICAL: Use Slash Commands for ALL Sprint Operations
+
+**NEVER manually:**
+- Create sprint folders or files
+- Edit `docs/sprints/registry.json`
+- Edit `.claude/sprint-*-state.json`
+- Move or rename sprint files
+- Update sprint status in YAML frontmatter
+- Call `scripts/sprint_lifecycle.py` directly
+
+**ALWAYS use slash commands:**
+
+```bash
+/sprint-new "Title"           # Create new sprint (auto-number)
+/sprint-new "Title" --epic=N  # Create sprint in epic
+/sprint-start <N>             # Start sprint, create state file
+/sprint-status                # Check progress
+/sprint-next                  # Advance to next step
+/sprint-complete <N>          # Complete with postmortem, tags, etc.
+```
+
+**What the slash commands handle:**
+
+| Command | Creates/Updates |
+|---------|----------------|
+| `/sprint-new` | Sprint folder, markdown file, registry entry |
+| `/sprint-start` | State file, YAML frontmatter (status, started) |
+| `/sprint-complete` | Postmortem, --done suffix, registry, git tag |
+
+**The slash commands invoke skills that use `scripts/sprint_lifecycle.py` internally.** You should NEVER call the script directly - always use the slash command.
+
 ## Sprint Types
 
 The workflow supports 6 sprint types with different quality gates to reduce false failures and enable experimental work:
