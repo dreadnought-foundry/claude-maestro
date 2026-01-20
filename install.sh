@@ -139,11 +139,18 @@ remove_existing_links() {
     done
 }
 
+save_source_path() {
+    # Save the source path so maestro-update can find it later
+    echo "$SCRIPT_DIR" > "$CLAUDE_DIR/maestro-source"
+    print_status "Saved source path: $SCRIPT_DIR"
+}
+
 install_symlinks() {
     print_info "Installing with symlinks..."
 
     backup_existing
     remove_existing_links
+    save_source_path
 
     # Create symlinks for directories
     for component in "${COMPONENTS[@]}"; do
@@ -174,6 +181,7 @@ install_copy() {
 
     backup_existing
     remove_existing_links
+    save_source_path
 
     # Copy directories
     for component in "${COMPONENTS[@]}"; do
