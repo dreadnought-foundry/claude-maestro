@@ -34,6 +34,7 @@ COMPONENTS=(
 
 FILES=(
     "sprint-steps.json"
+    "WORKFLOW_VERSION"
 )
 
 HOOKS=(
