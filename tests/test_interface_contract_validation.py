@@ -137,7 +137,13 @@ class TestContractValidation:
 
             assert is_valid is False
             assert len(errors) > 0
-            assert any("Schema validation failed" in err for err in errors)
+            # Either jsonschema validation error or manual validation error
+            assert any(
+                "Schema validation failed" in err or
+                "missing" in err.lower() or
+                "required" in err.lower()
+                for err in errors
+            )
 
     def test_backend_only_sprint_skips_validation(self):
         """Should skip contract validation for non-fullstack sprints."""

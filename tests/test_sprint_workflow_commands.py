@@ -75,11 +75,13 @@ class TestSprintCommandFileStructure:
     @pytest.mark.parametrize(
         "command_name,expected_tools",
         [
-            ("sprint-start", ["Read", "Write", "Glob", "Task"]),
-            ("sprint-status", ["Read", "Glob"]),
-            ("sprint-next", ["Read", "Write", "Edit", "Bash"]),
-            ("sprint-complete", ["Read", "Write", "Edit", "Bash"]),
-            ("sprint-abort", ["Read", "Write", "Edit"]),
+            # As of v3.5.0, commands are thin shells that call central Python script
+            # All commands only need Bash to execute the script
+            ("sprint-start", ["Bash"]),
+            ("sprint-status", ["Bash"]),
+            ("sprint-next", ["Bash"]),
+            ("sprint-complete", ["Bash"]),
+            ("sprint-abort", ["Bash"]),
         ],
     )
     def test_command_has_allowed_tools(self, command_name, expected_tools):
@@ -101,6 +103,11 @@ class TestSprintCommandFileStructure:
 class TestMultiSprintStateFilePattern:
     """Verify commands use sprint-specific state file pattern."""
 
+    @pytest.mark.skip(
+        reason="As of v3.5.0, commands are thin shells calling central Python script. "
+        "State file patterns are now in scripts/sprint_lifecycle.py. "
+        "See test_sprint_lifecycle.py for state file pattern tests."
+    )
     @pytest.mark.parametrize(
         "command_name",
         [
