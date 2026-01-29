@@ -1,6 +1,6 @@
 {
   "counters": {
-    "next_sprint": 1,
+    "next_sprint": 13,
     "next_epic": 1
   },
   "sprints": {
@@ -44,6 +44,56 @@
       "status": "done",
       "completed": "2026-01-06",
       "hours": 8.1
+    },
+    "8": {
+      "title": "Sprint Type Foundation",
+      "status": "planning",
+      "epic": 2,
+      "type": "fullstack",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "hours": null
+    },
+    "9": {
+      "title": "Quality Gate Integration",
+      "status": "planning",
+      "epic": 2,
+      "type": "fullstack",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "hours": null
+    },
+    "10": {
+      "title": "State Synchronization",
+      "status": "planning",
+      "epic": 2,
+      "type": "fullstack",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "hours": null
+    },
+    "11": {
+      "title": "Postmortem Generation",
+      "status": "planning",
+      "epic": 2,
+      "type": "fullstack",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "hours": null
+    },
+    "12": {
+      "title": "Epic Sprint Hierarchy",
+      "status": "planning",
+      "epic": 2,
+      "type": "fullstack",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "hours": null
     }
   },
   "epics": {
@@ -55,8 +105,18 @@
       "completed": null,
       "totalSprints": 7,
       "completedSprints": 3
+    },
+    "2": {
+      "title": "Auto-Claude Integration",
+      "status": "planning",
+      "created": "2026-01-29",
+      "started": null,
+      "completed": null,
+      "totalSprints": 10,
+      "completedSprints": 0,
+      "estimatedHours": 40.0
     }
   },
-  "nextSprintNumber": 5,
-  "nextEpicNumber": 2
+  "nextSprintNumber": 13,
+  "nextEpicNumber": 3
 }
