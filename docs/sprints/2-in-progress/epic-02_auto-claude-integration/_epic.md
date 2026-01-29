@@ -1,10 +1,11 @@
 ---
 epic: 2
 title: "Auto-Claude Integration"
-status: planning
+status: in-progress
 created: 2026-01-29
-started: null
+started: 2026-01-29T14:42:41Z
 completed: null
+
 ---
 
 # Epic 2: Auto-Claude Integration

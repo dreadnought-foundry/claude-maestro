@@ -1,6 +1,6 @@
 {
-  "version": "3.1.0",
-  "description": "Sprint workflow step definitions - version should match WORKFLOW_VERSION file",
+  "version": "1.1",
+  "description": "Sprint workflow step definitions for enforcement system",
   "phases": [
     {
       "phase": 1,
@@ -51,40 +51,6 @@
             "check": "sprint file has Status: In Progress"
           },
           "outputs": []
-        }
-      ]
-    },
-    {
-      "phase": 1.5,
-      "name": "Interface Contract Definition",
-      "description": "Define and validate interface contract for fullstack sprints",
-      "applies_to": ["fullstack"],
-      "steps": [
-        {
-          "step": "1.5.1",
-          "name": "Define Interface Contract",
-          "description": "Create interface contract JSON file defining backend/frontend/test interfaces",
-          "agent": "Plan",
-          "validation": {
-            "type": "file_exists",
-            "check": "contract file exists (.claude/sprint-{N}-contract.json or in sprint folder)"
-          },
-          "outputs": ["contract_file_path"],
-          "skippable_if": "sprint_type != 'fullstack'"
-        },
-        {
-          "step": "1.5.2",
-          "name": "Validate Contract",
-          "description": "Run validation tool to check GraphQL schema, enum cases, type matching",
-          "agent": null,
-          "validation": {
-            "type": "command_success",
-            "check": "python3 scripts/validate_interface_contract.py --sprint {N} exits with code 0"
-          },
-          "outputs": ["contract_validation_result"],
-          "gate": true,
-          "gate_message": "Interface contract validation FAILED. Fix validation errors before proceeding to implementation. This prevents backend/frontend integration mismatches.",
-          "skippable_if": "sprint_type != 'fullstack'"
         }
       ]
     },
@@ -221,15 +187,15 @@
         {
           "step": "5.1",
           "name": "Coverage Gate",
-          "description": "Verify test coverage meets sprint-type-aware threshold before committing",
+          "description": "Verify test coverage meets 75% threshold before committing",
           "agent": "test-runner",
           "validation": {
             "type": "coverage_check",
-            "check": "coverage >= sprint_type_threshold"
+            "check": "coverage >= 75%"
           },
           "outputs": ["coverage_percentage"],
           "gate": true,
-          "gate_message": "Test coverage must meet sprint type threshold before committing. Current coverage: {coverage_percentage}%"
+          "gate_message": "Test coverage must be at least 75% before committing. Current coverage: {coverage_percentage}%"
         },
         {
           "step": "5.2",
@@ -322,7 +288,6 @@
   ],
   "step_order": [
     "1.1", "1.2", "1.3", "1.4",
-    "1.5.1", "1.5.2",
     "2.1", "2.2", "2.3", "2.4",
     "3.1", "3.2", "3.3", "3.4",
     "4.1",

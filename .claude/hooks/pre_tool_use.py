@@ -408,10 +408,6 @@ def check_sprint_completion_gate(tool_name, tool_input, project_root):
     if tool_name == 'Bash':
         command = tool_input.get('command', '')
 
-        # WHITELIST: Allow operations from authorized automation scripts
-        if 'scripts/sprint_lifecycle.py' in command:
-            return {'continue': True}  # Bypass gate for automation
-
         # Check for sprint file moves
         if ('mv ' in command or 'git mv ' in command) and 'sprint-' in command:
             match = re.search(r'sprint-(\d+)', command)
