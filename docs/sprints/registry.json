@@ -47,13 +47,13 @@
     },
     "8": {
       "title": "Sprint Type Foundation",
-      "status": "planning",
+      "status": "done",
       "epic": 2,
       "type": "fullstack",
       "created": "2026-01-29",
       "started": null,
-      "completed": null,
-      "hours": null
+      "completed": "2026-01-29",
+      "hours": 10.2
     },
     "9": {
       "title": "Quality Gate Integration",
@@ -113,7 +113,7 @@
       "started": null,
       "completed": null,
       "totalSprints": 10,
-      "completedSprints": 0,
+      "completedSprints": 1,
       "estimatedHours": 40.0
     }
   },
