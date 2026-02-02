@@ -58,6 +58,7 @@ This automatically:
 - Increments registry counter
 - Registers sprint in registry.json with metadata
 - Links to epic if specified
+- **Creates the sprint folder and markdown file** (no need to create manually!)
 
 **If using manual number mode**, check for conflicts:
 ```bash
@@ -67,122 +68,34 @@ docs/sprints/sprint-*.md
 # Verify the sprint number doesn't already exist
 ```
 
-### 3. Create Sprint Directory (if needed)
+### 3. Fill in Sprint Details
 
-```bash
-mkdir -p docs/sprints
-```
+The `register-sprint` command creates the sprint file with a basic template. Now fill in the details:
 
-### 4. Create Sprint File
+1. Read the auto-created file (path shown in register-sprint output)
+2. Update these sections with specific content:
+   - **Goal**: One sentence describing what this sprint accomplishes
+   - **Background**: Why is this needed? What problem does it solve?
+   - **Requirements**: Specific functional and non-functional requirements
+   - **Dependencies**: Sprints that must be completed first, external dependencies
+   - **Scope**: What's in scope and out of scope
+   - **Technical Approach**: High-level implementation description
+   - **Tasks**: Specific tasks for each phase
+   - **Acceptance Criteria**: How we know this is done
 
-Create `docs/sprints/sprint-{NN}_{slug}.md` where:
-- `{NN}` is zero-padded sprint number (01, 02, etc.)
-- `{slug}` is lowercase, hyphenated title (e.g., "user-authentication")
+**IMPORTANT**: Do NOT create a new file - edit the existing one created by register-sprint.
 
-Use this template:
-
-```markdown
-# Sprint {N}: {Title}
-
-## Overview
-
-| Field | Value |
-|-------|-------|
-| Sprint | {N} |
-| Title | {Title} |
-| Epic | {Epic number or "None"} |
-| Status | Planning |
-| Created | {TODAY} |
-| Started | - |
-| Completed | - |
-
-## Goal
-
-{One sentence describing what this sprint accomplishes}
-
-## Background
-
-{Why is this needed? What problem does it solve?}
-
-## Requirements
-
-### Functional Requirements
-
-- [ ] {Requirement 1}
-- [ ] {Requirement 2}
-- [ ] {Requirement 3}
-
-### Non-Functional Requirements
-
-- [ ] {Performance, security, or other constraints}
-
-## Dependencies
-
-- **Sprints**: {List any sprints that must be completed first, or "None"}
-- **External**: {External dependencies like APIs, libraries, etc.}
-
-## Scope
-
-### In Scope
-
-- {What's included}
-
-### Out of Scope
-
-- {What's explicitly NOT included}
-
-## Technical Approach
-
-{High-level description of how this will be implemented}
-
-## Tasks
-
-### Phase 1: Planning
-- [ ] Review requirements with stakeholder
-- [ ] Design code architecture
-- [ ] Clarify any ambiguous requirements
-
-### Phase 2: Implementation
-- [ ] Write tests
-- [ ] Implement feature
-- [ ] Fix any test failures
-
-### Phase 3: Validation
-- [ ] Verify migrations (if applicable)
-- [ ] Quality review
-- [ ] Refactoring
-
-### Phase 4: Documentation
-- [ ] Create dialog example (if applicable)
-- [ ] Update relevant docs
-
-## Acceptance Criteria
-
-- [ ] {Criterion 1 - how do we know this is done?}
-- [ ] {Criterion 2}
-- [ ] All tests passing
-- [ ] Code reviewed and refactored
-
-## Open Questions
-
-- {Any questions that need answers before or during implementation}
-
-## Notes
-
-{Any additional context, links, references}
-```
-
-### 5. Update Epic File (if epic specified)
+### 4. Update Epic File (if epic specified)
 
 If --epic=N was provided:
-1. Find the epic file: `docs/epics/epic-{NN}_*.md`
+1. Find the epic file: `docs/sprints/*/epic-{NN}_*/_epic.md`
 2. Add a new row to the Sprints table:
    ```
    | {Sprint} | {Title} | planned |
    ```
 3. If epic file not found, warn user but still create sprint
 
-### 6. Report
+### 5. Report
 
 Output:
 ```

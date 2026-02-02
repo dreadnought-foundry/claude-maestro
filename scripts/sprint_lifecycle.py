@@ -127,6 +127,10 @@ def _find_sprint_file(sprint_num: int, project_root: Path) -> Optional[Path]:
     """
     Find sprint file by number in any status directory.
 
+    Supports two patterns:
+    1. Direct file: sprint-NN_title.md
+    2. Folder with sprint.md: sprint-NN_title/sprint.md
+
     Args:
         sprint_num: Sprint number to find
         project_root: Project root path
@@ -146,17 +150,31 @@ def _find_sprint_file(sprint_num: int, project_root: Path) -> Optional[Path]:
         if not status_dir.is_dir():
             continue
 
-        # Check direct children (standalone sprints)
+        # Check direct children (standalone sprints) - pattern: sprint-NN_title.md
         for sprint_file in status_dir.glob(f"{pattern}.md"):
             # Exclude postmortem files
             if "_postmortem.md" not in sprint_file.name:
                 return sprint_file
 
-        # Check in epic folders (sprints may be in subdirectories)
+        # Check in epic folders - pattern: epic-NN/sprint-NN_title.md
         for sprint_file in status_dir.glob(f"**/{pattern}.md"):
             # Exclude postmortem files
             if "_postmortem.md" not in sprint_file.name:
                 return sprint_file
+
+        # Check for sprint folders with sprint.md inside - pattern: sprint-NN_title/sprint.md
+        for sprint_dir in status_dir.glob(pattern):
+            if sprint_dir.is_dir():
+                sprint_file = sprint_dir / "sprint.md"
+                if sprint_file.exists():
+                    return sprint_file
+
+        # Check in epic folders for sprint folders - pattern: epic-NN/sprint-NN_title/sprint.md
+        for sprint_dir in status_dir.glob(f"**/{pattern}"):
+            if sprint_dir.is_dir():
+                sprint_file = sprint_dir / "sprint.md"
+                if sprint_file.exists():
+                    return sprint_file
 
     return None
 
@@ -289,7 +307,11 @@ def move_to_done(sprint_num: int, dry_run: bool = False) -> Path:
                 # Sprint in subdirectory
                 sprint_subdir = sprint_file.parent
                 new_dir_name = sprint_subdir.name + "--done"
-                new_name = sprint_file.name.replace(".md", "--done.md")
+                # If file is generic "sprint.md", derive name from folder
+                if sprint_file.name == "sprint.md":
+                    new_name = sprint_subdir.name + "--done.md"
+                else:
+                    new_name = sprint_file.name.replace(".md", "--done.md")
                 print("[DRY RUN] Would rename epic sprint subdirectory and file:")
                 print(f"  From: {sprint_file}")
                 print(f"  Dir:  {sprint_subdir.name} → {new_dir_name}")
@@ -335,7 +357,11 @@ def move_to_done(sprint_num: int, dry_run: bool = False) -> Path:
             if sprint_file.parent.name.startswith("sprint-"):
                 # Sprint is in a subdirectory - move file up and rename dir
                 sprint_subdir = sprint_file.parent
-                new_name = sprint_file.name.replace(".md", "--done.md")
+                # If file is generic "sprint.md", derive name from folder
+                if sprint_file.name == "sprint.md":
+                    new_name = sprint_subdir.name + "--done.md"
+                else:
+                    new_name = sprint_file.name.replace(".md", "--done.md")
                 new_dir_name = sprint_subdir.name + "--done"
                 new_subdir = sprint_subdir.with_name(new_dir_name)
 
@@ -353,17 +379,52 @@ def move_to_done(sprint_num: int, dry_run: bool = False) -> Path:
                 new_path = sprint_file.with_name(new_name)
                 sprint_file.rename(new_path)
         else:
-            # Standalone sprint: move to 3-done/_standalone/
-            standalone_dir = (
+            # Standalone sprint: move to 3-done/_standalone/ in its own directory
+            standalone_base = (
                 project_root / "docs" / "sprints" / "3-done" / "_standalone"
             )
-            standalone_dir.mkdir(parents=True, exist_ok=True)
+            standalone_base.mkdir(parents=True, exist_ok=True)
 
-            new_name = sprint_file.name.replace(".md", "--done.md")
-            new_path = standalone_dir / new_name
+            # Determine the sprint directory name with --done suffix
+            # If sprint is in a subdirectory, use that name; otherwise derive from filename
+            if sprint_file.parent.name.startswith("sprint-"):
+                # Sprint is in a subdirectory (e.g., sprint-34_name/)
+                sprint_subdir = sprint_file.parent
+                new_dir_name = sprint_subdir.name + "--done"
+                new_sprint_dir = standalone_base / new_dir_name
+                new_sprint_dir.mkdir(parents=True, exist_ok=True)
 
-            # Move file
-            shutil.move(str(sprint_file), str(new_path))
+                # Move all files from source directory to new directory
+                for item in sprint_subdir.iterdir():
+                    dest = new_sprint_dir / item.name
+                    # Only rename the main sprint file with --done suffix
+                    # (not postmortem, quality-assessment, or state files)
+                    if (item.suffix == ".md"
+                        and item.name.startswith("sprint-")
+                        and "_postmortem" not in item.name
+                        and item.name == sprint_file.name):
+                        dest = new_sprint_dir / item.name.replace(".md", "--done.md")
+                    shutil.move(str(item), str(dest))
+
+                # Remove empty source directory
+                sprint_subdir.rmdir()
+
+                # Find the main sprint file in new location
+                new_name = sprint_file.name.replace(".md", "--done.md")
+                new_path = new_sprint_dir / new_name
+            else:
+                # Sprint is a standalone file (no subdirectory)
+                # Create a directory for it based on filename
+                base_name = sprint_file.stem  # e.g., sprint-34_dockerize-clawbot
+                new_dir_name = base_name + "--done"
+                new_sprint_dir = standalone_base / new_dir_name
+                new_sprint_dir.mkdir(parents=True, exist_ok=True)
+
+                new_name = sprint_file.name.replace(".md", "--done.md")
+                new_path = new_sprint_dir / new_name
+
+                # Move file
+                shutil.move(str(sprint_file), str(new_path))
 
         return new_path
 
@@ -1924,16 +1985,24 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     for folder in ["0-backlog", "1-todo"]:
         search_path = project_root / "docs" / "sprints" / folder
         if search_path.exists():
+            # Pattern 1: sprint-NN_title.md files
             found = list(search_path.glob(f"**/sprint-{sprint_num:02d}_*.md"))
             if found:
                 sprint_file = found[0]
+                break
+            # Pattern 2: sprint-NN_title/sprint.md folders
+            for sprint_dir in search_path.glob(f"**/sprint-{sprint_num:02d}_*"):
+                if sprint_dir.is_dir() and (sprint_dir / "sprint.md").exists():
+                    sprint_file = sprint_dir / "sprint.md"
+                    break
+            if sprint_file:
                 break
 
     # If not found in backlog/todo, check if it's an epic sprint already in progress
     if not sprint_file:
         search_path = project_root / "docs" / "sprints" / "2-in-progress"
         if search_path.exists():
-            # Look for sprint in epic folders (exclude --done files)
+            # Pattern 1: Look for sprint files in epic folders (exclude --done files)
             found = [
                 f
                 for f in search_path.glob(f"**/sprint-{sprint_num:02d}_*.md")
@@ -1942,6 +2011,14 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
             if found:
                 sprint_file = found[0]
                 already_in_progress = True
+            else:
+                # Pattern 2: sprint-NN_title/sprint.md folders (exclude --done folders)
+                for sprint_dir in search_path.glob(f"**/sprint-{sprint_num:02d}_*"):
+                    if sprint_dir.is_dir() and "--done" not in sprint_dir.name:
+                        if (sprint_dir / "sprint.md").exists():
+                            sprint_file = sprint_dir / "sprint.md"
+                            already_in_progress = True
+                            break
 
     if not sprint_file:
         raise FileOperationError(
@@ -4189,9 +4266,10 @@ def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
         print(f"     {sprint_file.name}")
         print(f"     → {new_file_name}")
         print(f"\n  3. Update registry (status=done, hours={hours})")
-        print("  4. Commit changes")
-        print(f"  5. Create and push git tag: sprint-{sprint_num}")
-        print("  6. Check epic completion")
+        print(f"  4. Archive state file to sprint done folder")
+        print("  5. Commit changes")
+        print(f"  6. Create and push git tag: sprint-{sprint_num}")
+        print("  7. Check epic completion")
         return {"status": "dry-run", "sprint_num": sprint_num, "hours": hours}
 
     # 4. Move sprint file to done
@@ -4245,16 +4323,20 @@ def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
         if is_complete:
             print(f"\n💡 Epic {epic_num} is ready! Run: /epic-complete {epic_num}")
 
-    # 9. Update state file
+    # 9. Update state file and move to sprint done folder
     state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
     if state_file.exists():
         with open(state_file) as f:
             state = json.load(f)
         state["status"] = "complete"
         state["completed_at"] = completed.isoformat()
-        with open(state_file, "w") as f:
+        # Move state file to sprint's done folder as an audit artifact
+        dest_dir = Path(new_path).parent
+        dest_state = dest_dir / f"sprint-{sprint_num}-state.json"
+        with open(dest_state, "w") as f:
             json.dump(state, f, indent=2)
-        print("✓ State file updated")
+        state_file.unlink()
+        print(f"✓ State file archived to {dest_state.relative_to(project_root)}")
 
     # 10. Success summary
     summary = {

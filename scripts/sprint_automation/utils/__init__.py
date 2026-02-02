@@ -29,6 +29,25 @@ from .state import (
     state_exists,
     update_state,
 )
+from .unified_state import (
+    UNIFIED_STATE_VERSION,
+    STATE_FILE_NAME,
+    find_project_root as find_project_root_unified,
+    get_state_path,
+    load_state as load_unified_state,
+    save_state as save_unified_state,
+    get_task,
+    upsert_task,
+    delete_task,
+    get_tasks_by_pipeline,
+    get_active_tasks,
+    create_maestro_task,
+    create_autonomous_task,
+    update_maestro_progress,
+    update_autonomous_progress,
+    complete_task,
+    fail_task,
+)
 
 __all__ = [
     # file_ops
@@ -54,4 +73,22 @@ __all__ = [
     "save_state",
     "state_exists",
     "update_state",
+    # unified_state
+    "UNIFIED_STATE_VERSION",
+    "STATE_FILE_NAME",
+    "find_project_root_unified",
+    "get_state_path",
+    "load_unified_state",
+    "save_unified_state",
+    "get_task",
+    "upsert_task",
+    "delete_task",
+    "get_tasks_by_pipeline",
+    "get_active_tasks",
+    "create_maestro_task",
+    "create_autonomous_task",
+    "update_maestro_progress",
+    "update_autonomous_progress",
+    "complete_task",
+    "fail_task",
 ]
