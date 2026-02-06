@@ -36,3 +36,5 @@ workspace_tickets/
 .venv/
 **/__pycache__/
 *.pyc
+.DS_Store
+*.code-workspace
