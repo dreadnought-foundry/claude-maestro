@@ -66,7 +66,11 @@ After user responds, advance step.
 
 **Phase 3 - Validation & Refactoring:**
 - 3.1: Verify migrations (skip if none)
-- 3.2: Quality review using quality-engineer agent
+- 3.2: Run ALL Tests (not just changed files):
+  - Run the COMPLETE test suite: `npx jest --no-coverage` (frontend) and `pytest` (backend)
+  - If tests fail in files NOT touched by this sprint, these are collateral failures
+  - Collateral failures from text/copy changes MUST be fixed before advancing
+  - Common pattern: test uses getByText/getByRole with old text that was changed
 - 3.3: Refactoring based on review
 - 3.4: Re-run tests after refactoring
 

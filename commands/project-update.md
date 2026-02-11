@@ -11,8 +11,8 @@ Sync workflow updates from the master environment to the current project.
 
 | Component | Source | Action |
 |-----------|--------|--------|
-| Commands | `~/.claude/commands/` | Central (run `install.sh` to update) |
-| Scripts | `~/.claude/scripts/` | Central (run `install.sh` to update) |
+| Commands | `commands/*.md` from master project | Add/Update |
+| Scripts | `scripts/sprint_lifecycle.py` from master project | Update |
 | Agents | `~/.claude/agents/` + `~/.claude/templates/project/.claude/agents/` | Add/Update |
 | Hooks | `~/.claude/hooks/` + `~/.claude/templates/project/.claude/hooks/` | Add/Update |
 | sprint-steps.json | `~/.claude/templates/project/.claude/sprint-steps.json` | Update |
@@ -20,8 +20,6 @@ Sync workflow updates from the master environment to the current project.
 | CLAUDE.md | `~/.claude/templates/project/CLAUDE.md` | **Skip** (user customized) |
 | settings.json | - | **Skip** (project specific) |
 | State files | - | **Skip** (runtime data) |
-
-**Note:** Commands and scripts are now central. To update them, run `./install.sh` in the claude-maestro repo.
 
 ## Instructions
 
@@ -60,31 +58,68 @@ cp "$TARGET_PATH/.claude/sprint-steps.json" "$BACKUP_DIR/" 2>/dev/null || true
 echo "Backup created at: $BACKUP_DIR"
 ```
 
-### 4. Check Central Installation
+### 4. Sync Commands
 
 ```bash
 echo ""
-echo "=== Checking Central Installation ==="
+echo "=== Syncing Commands ==="
 
-MAESTRO_HOME="$HOME/.claude"
+COMMANDS_ADDED=0
+COMMANDS_UPDATED=0
+COMMANDS_UNCHANGED=0
 
-# Check if Maestro is properly installed
-if [ ! -d "$MAESTRO_HOME/scripts" ]; then
-  echo "WARNING: Scripts not found at $MAESTRO_HOME/scripts"
-  echo "Run ./install.sh in the claude-maestro repo to update"
-else
-  echo "✓ Central scripts: $MAESTRO_HOME/scripts"
-fi
+# Get master project path (this current project)
+MASTER_PROJECT="$HOME/Development/Dreadnought/claude-maestro"
 
-if [ ! -d "$MAESTRO_HOME/commands" ]; then
-  echo "WARNING: Commands not found at $MAESTRO_HOME/commands"
-  echo "Run ./install.sh in the claude-maestro repo to update"
-else
-  echo "✓ Central commands: $MAESTRO_HOME/commands"
+# Create commands directory if it doesn't exist
+mkdir -p "$TARGET_PATH/commands"
+
+# Sync command files
+for cmd in "$MASTER_PROJECT/commands"/*.md; do
+  [ -f "$cmd" ] || continue
+  filename=$(basename "$cmd")
+  target="$TARGET_PATH/commands/$filename"
+
+  if [ ! -f "$target" ]; then
+    cp "$cmd" "$target"
+    echo "  Added: $filename"
+    ((COMMANDS_ADDED++))
+  elif ! diff -q "$cmd" "$target" > /dev/null 2>&1; then
+    cp "$cmd" "$target"
+    echo "  Updated: $filename"
+    ((COMMANDS_UPDATED++))
+  else
+    ((COMMANDS_UNCHANGED++))
+  fi
+done
+
+echo "Commands: $COMMANDS_ADDED added, $COMMANDS_UPDATED updated, $COMMANDS_UNCHANGED unchanged"
+```
+
+### 5. Sync Scripts
+
+```bash
+echo ""
+echo "=== Syncing Scripts ==="
+
+# Create scripts directory if it doesn't exist
+mkdir -p "$TARGET_PATH/scripts"
+
+# Sync sprint_lifecycle.py
+if [ -f "$MASTER_PROJECT/scripts/sprint_lifecycle.py" ]; then
+  if [ ! -f "$TARGET_PATH/scripts/sprint_lifecycle.py" ]; then
+    cp "$MASTER_PROJECT/scripts/sprint_lifecycle.py" "$TARGET_PATH/scripts/"
+    echo "  Added: sprint_lifecycle.py"
+  elif ! diff -q "$MASTER_PROJECT/scripts/sprint_lifecycle.py" "$TARGET_PATH/scripts/sprint_lifecycle.py" > /dev/null 2>&1; then
+    cp "$MASTER_PROJECT/scripts/sprint_lifecycle.py" "$TARGET_PATH/scripts/"
+    echo "  Updated: sprint_lifecycle.py"
+  else
+    echo "  Unchanged: sprint_lifecycle.py"
+  fi
 fi
 ```
 
-### 5. Sync Agents
+### 6. Sync Agents
 
 Track changes:
 - ADDED: New agents not in project
@@ -140,7 +175,7 @@ done
 echo "Agents: $AGENTS_ADDED added, $AGENTS_UPDATED updated, $AGENTS_UNCHANGED unchanged"
 ```
 
-### 6. Sync Hooks
+### 7. Sync Hooks
 
 ```bash
 echo ""
@@ -191,7 +226,7 @@ done
 echo "Hooks: $HOOKS_ADDED added, $HOOKS_UPDATED updated, $HOOKS_UNCHANGED unchanged"
 ```
 
-### 7. Sync Configuration
+### 8. Sync Configuration
 
 ```bash
 echo ""
@@ -214,7 +249,7 @@ if [ -f ~/.claude/WORKFLOW_VERSION ]; then
 fi
 ```
 
-### 8. Report Preserved Files
+### 9. Report Preserved Files
 
 ```bash
 echo ""
@@ -225,13 +260,14 @@ echo "  - .claude/product-state.json (runtime state)"
 echo "  - CLAUDE.md (user customized)"
 ```
 
-### 9. Report Summary
+### 10. Report Summary
 
 ```
 ✅ Project workflow updated: $TARGET_PATH
 
 Summary:
-  Commands/Scripts: Central (~/.claude/) - run install.sh to update
+  Commands: $COMMANDS_ADDED added, $COMMANDS_UPDATED updated
+  Scripts: sprint_lifecycle.py synced
   Agents: $AGENTS_ADDED added, $AGENTS_UPDATED updated
   Hooks: $HOOKS_ADDED added, $HOOKS_UPDATED updated
   Config: sprint-steps.json, WORKFLOW_VERSION
