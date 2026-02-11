@@ -29,7 +29,7 @@ When running in claude-maestro repository:
 
 When running in a regular project:
 - Copies FROM `~/.claude/templates/project/` TO `./.claude/`
-- Uses central commands and scripts from `~/.claude/`
+- Includes commands/ and scripts/ for automation
 - Standard project setup
 
 **Usage:**
@@ -50,8 +50,8 @@ When running in a regular project:
 
 | Component | Source | Destination |
 |-----------|--------|-------------|
-| Commands | `~/.claude/commands/` | Used centrally (not copied) |
-| Scripts | `~/.claude/scripts/` | Used centrally (not copied) |
+| Commands | `~/Development/Dreadnought/claude-maestro/commands/` | `./commands/` |
+| Scripts | `~/Development/Dreadnought/claude-maestro/scripts/` | `./scripts/` |
 | Global Agents | `~/.claude/agents/` | `.claude/agents/` |
 | Project Agents | `~/.claude/templates/project/.claude/agents/` | `.claude/agents/` |
 | Global Hooks | `~/.claude/hooks/` | `.claude/hooks/` |
@@ -72,7 +72,7 @@ When running in a regular project:
 
 **Prerequisites:**
 - Target directory must exist
-- **Normal mode**: Maestro installed globally (run `./install.sh` from claude-maestro repo)
+- **Normal mode**: Master project at `~/Development/Dreadnought/claude-maestro`
 - **Maestro mode**: `templates/project/` directory exists
 
 **Next Steps After Creation:**
