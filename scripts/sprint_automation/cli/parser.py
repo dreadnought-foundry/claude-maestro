@@ -107,4 +107,19 @@ def create_parser() -> argparse.ArgumentParser:
     registry_update.add_argument("status", help="New status")
     registry_update.add_argument("--dry-run", action="store_true", help="Preview only")
 
+    # Context builder
+    build_context_cmd = subparsers.add_parser(
+        "build-context", help="Generate context brief for a sprint"
+    )
+    build_context_cmd.add_argument("sprint_num", type=int, help="Target sprint number")
+    build_context_cmd.add_argument(
+        "--token-budget",
+        type=int,
+        default=8000,
+        help="Max approximate tokens for brief (default: 8000)",
+    )
+    build_context_cmd.add_argument(
+        "--output", help="Output file path (default: .claude/sprint-N-context.md)"
+    )
+
     return parser

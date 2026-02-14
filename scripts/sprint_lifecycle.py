@@ -3926,7 +3926,12 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     maestro_mode = (target / "templates" / "project").exists()
 
     # 4. Define source paths based on mode
-    master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
+    # Read master project path from installer config, fallback to default
+    maestro_source_file = Path.home() / ".claude" / "maestro-source"
+    if maestro_source_file.exists():
+        master_project = Path(maestro_source_file.read_text().strip())
+    else:
+        master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
     global_claude = Path.home() / ".claude"
 
     if maestro_mode:
