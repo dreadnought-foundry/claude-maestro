@@ -153,3 +153,14 @@ See `docs/patterns/sprint-type-classification.md` for detailed guidance includin
 - Examples of each type
 - Common scenarios and recommendations
 - Override best practices
+
+## Knowledge Base
+
+Architecture patterns, playbooks, standards, and workflow documentation live in `knowledge/`. See [knowledge/README.md](knowledge/README.md) for the full index.
+
+Key references:
+- **Patterns** — `knowledge/patterns/` — Reusable architecture recipes (provider pattern, domain layering, etc.)
+- **Playbooks** — `knowledge/playbooks/` — Step-by-step guides (project bootstrap, deployment, data sources)
+- **Standards** — `knowledge/standards/` — Coding conventions and quality standards
+- **Workflows** — `knowledge/workflows/` — Process docs (sprint lifecycle, migrations, postmortems)
+- **ADR Synthesis** — `knowledge/ADR-SYNTHESIS.md` — 49 architecture decision records
