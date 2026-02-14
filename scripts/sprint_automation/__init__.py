@@ -89,6 +89,9 @@ from .sprint import (
     start_sprint,
 )
 
+# Context builder
+from .context import build_context
+
 # Utilities
 from .utils import (
     check_git_clean,
@@ -152,6 +155,8 @@ __all__ = [
     "recover_sprint",
     "resume_sprint",
     "start_sprint",
+    # Context builder
+    "build_context",
     # Utilities
     "check_git_clean",
     "create_git_tag",
