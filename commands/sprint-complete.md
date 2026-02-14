@@ -47,17 +47,40 @@ This single command handles ALL completion steps automatically:
 
 ## Prerequisites
 
-Before running `/sprint-complete`:
+Before running the automation script, generate a **real** postmortem from actual data:
 
-1. **Postmortem Required** - Sprint file must have `## Postmortem` section
-   - If missing: Run `/sprint-postmortem $ARGUMENTS` first
-   - See postmortem skill for format requirements
+### 1. Generate Real Postmortem
 
-2. **Work Committed** - All implementation work should be committed
+**DO NOT use TODO-filled templates.** Instead:
+
+**Gather git metrics:**
+```bash
+git diff --stat HEAD~20..HEAD
+git log --oneline --since="<started_timestamp>" | wc -l
+```
+
+**Run tests and compare baseline:**
+```bash
+PYTHONPATH=claude-maestro/scripts python3 -m sprint_automation.analysis.test_baseline compare $ARGUMENTS --project-root . 2>/dev/null || echo "NO_BASELINE"
+```
+
+**Verify acceptance criteria with receipts:**
+For each criterion in the sprint file, find the implementing code and map to `file:line`:
+```markdown
+| Criterion | Status | Evidence |
+|-----------|--------|----------|
+| <text> | VERIFIED | `path/file.ts:42` |
+```
+
+**Write the postmortem** to the sprint file with real numbers from the commands above.
+Every metric must come from actual data. Every acceptance criterion needs a code receipt.
+
+### 2. Work Committed
+   - All implementation work should be committed
    - The completion itself will create a final commit
-   - But don't mix completion with implementation changes
 
-3. **YAML Frontmatter** - Sprint file needs proper frontmatter:
+### 3. YAML Frontmatter
+   Sprint file needs proper frontmatter:
    ```yaml
    ---
    sprint: N

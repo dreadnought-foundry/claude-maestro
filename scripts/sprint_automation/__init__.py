@@ -89,6 +89,9 @@ from .sprint import (
     start_sprint,
 )
 
+# Analysis
+from .analysis import analyze_patterns, capture_baseline, compare_baseline
+
 # Utilities
 from .utils import (
     check_git_clean,
@@ -105,6 +108,10 @@ from .utils import (
 __version__ = "1.0.0"
 
 __all__ = [
+    # Analysis
+    "analyze_patterns",
+    "capture_baseline",
+    "compare_baseline",
     # Constants
     "FOLDER_ARCHIVED",
     "FOLDER_BACKLOG",

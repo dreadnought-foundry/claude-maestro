@@ -11,6 +11,32 @@ This command starts a sprint and automatically executes the workflow through imp
 
 ## Instructions
 
+### 0. Build Context Brief (Auto-loaded)
+
+Before initializing the sprint, build intelligence from project history.
+This step fails gracefully — if there's no history, skip to step 1.
+
+**0.1: Anti-Pattern Early Warning**
+
+Mine recent postmortems for recurring issues:
+```bash
+PYTHONPATH=claude-maestro/scripts python3 -m sprint_automation.analysis.pattern_analyzer --project-root . --limit 10 2>/dev/null || echo "SKIP_PATTERNS"
+```
+If recurring issues found, surface them before planning. If the script fails or no issues, continue.
+
+**0.2: Capture Test Baseline**
+
+Snapshot current test state before making changes:
+```bash
+PYTHONPATH=claude-maestro/scripts python3 -m sprint_automation.analysis.test_baseline capture $ARGUMENTS --project-root . 2>/dev/null || echo "SKIP_BASELINE"
+```
+Records pre-existing failures to `.claude/test-baseline-$ARGUMENTS.json`.
+
+**0.3: Read Project Context**
+
+Read CLAUDE.md for code standards, architecture patterns, and sprint-relevant context.
+If no CLAUDE.md exists, skip silently.
+
 ### 1. Initialize Sprint
 
 Run the start-sprint automation:
