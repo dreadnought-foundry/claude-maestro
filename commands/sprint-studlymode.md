@@ -1,11 +1,11 @@
 ---
-description: "Start a sprint with automatic context injection (context-aware sprint start)"
+description: "Start a sprint in studly mode - auto-loads project context before executing"
 allowed-tools: [Bash, Read, Glob, Grep, Task, Edit, Write, AskUserQuestion]
 ---
 
-# Start Sprint with Context (Automated Workflow)
+# Start Sprint — Studly Mode
 
-This command is identical to `/sprint-start` but automatically generates and reads a project context brief first. This gives you full awareness of prior sprints, project conventions, and key decisions before starting implementation.
+`/sprint-start` but smarter. Automatically generates and loads a project context brief before executing the sprint workflow. Claude gets full awareness of prior sprints, project conventions, and key decisions without you lifting a finger.
 
 Use this instead of `/sprint-start` when working on a project with multiple completed sprints.
 
@@ -134,4 +134,4 @@ If any step fails:
 - Report the error clearly
 - Do NOT advance to next step
 - Suggest fix or ask user for guidance
-- User can retry with `/sprint-start-ctx $ARGUMENTS` to resume from current step
+- User can retry with `/sprint-studlymode $ARGUMENTS` to resume from current step
