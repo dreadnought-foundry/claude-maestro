@@ -11,6 +11,24 @@ This command starts a sprint and automatically executes the workflow through imp
 
 ## Instructions
 
+### 0. Build Project Context (Automatic)
+
+Before anything else, generate a context brief so you have full project awareness:
+
+```bash
+cd <project_root> && PYTHONPATH=~/.claude/scripts python3 -m sprint_automation build-context $ARGUMENTS
+```
+
+Then read the generated brief:
+
+```bash
+cat .claude/sprint-*-context.md
+```
+
+This gives you: prior sprint summaries, project tech stack, team structure, code standards, and key decisions. Use this context throughout the sprint — do NOT ask the user for information that's already in the brief.
+
+If the context builder fails (missing module, no registry), skip this step and continue normally. It's not blocking.
+
 ### 1. Initialize Sprint
 
 Run the start-sprint automation:
@@ -25,11 +43,13 @@ If sprint is already started, continue from current step.
 
 **Step 1.1 - Read Sprint File:**
 - Read the sprint file from the state
+- Also read the context brief from step 0 if it was generated
 - Understand requirements, scope, and technical approach
 - Advance step: `python3 ~/.claude/scripts/sprint_lifecycle.py advance-step $ARGUMENTS`
 
 **Step 1.2 - Spawn Plan Agent:**
 - Use Task tool with subagent_type="Plan" to design implementation
+- Include the context brief in the agent prompt so it has project awareness
 - Prompt should include sprint requirements and ask for:
   - Files to create/modify
   - Architecture decisions
