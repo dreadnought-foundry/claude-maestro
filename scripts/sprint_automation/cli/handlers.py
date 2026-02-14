@@ -6,6 +6,7 @@ Maps CLI commands to their corresponding functions.
 
 import sys
 
+from ..context import build_context
 from ..sprint import (
     create_sprint,
     start_sprint,
@@ -83,6 +84,12 @@ def handle_command(args) -> int:
             create_project(target_path=args.path, dry_run=args.dry_run)
         elif args.command == "registry-update":
             update_registry(args.sprint_num, args.status, dry_run=args.dry_run)
+        elif args.command == "build-context":
+            build_context(
+                args.sprint_num,
+                token_budget=args.token_budget,
+                output_file=args.output,
+            )
         else:
             print(f"Unknown command: {args.command}")
             return 1

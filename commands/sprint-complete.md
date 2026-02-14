@@ -1,6 +1,6 @@
 ---
 description: "Complete a sprint with full automation"
-allowed-tools: [Bash]
+allowed-tools: [Bash, Read, Glob, Grep, Edit, Write]
 ---
 
 # Complete Sprint

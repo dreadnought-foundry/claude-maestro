@@ -127,9 +127,10 @@ def _find_sprint_file(sprint_num: int, project_root: Path) -> Optional[Path]:
     """
     Find sprint file by number in any status directory.
 
-    Supports two patterns:
+    Supports three patterns:
     1. Direct file: sprint-NN_title.md
     2. Folder with sprint.md: sprint-NN_title/sprint.md
+    3. Folder with numbered file: sprint-NN_title/sprint-NN.md
 
     Args:
         sprint_num: Sprint number to find
@@ -168,6 +169,10 @@ def _find_sprint_file(sprint_num: int, project_root: Path) -> Optional[Path]:
                 sprint_file = sprint_dir / "sprint.md"
                 if sprint_file.exists():
                     return sprint_file
+                # Pattern 3: sprint-NN_title/sprint-NN.md
+                numbered = sprint_dir / f"sprint-{sprint_num}.md"
+                if numbered.exists():
+                    return numbered
 
         # Check in epic folders for sprint folders - pattern: epic-NN/sprint-NN_title/sprint.md
         for sprint_dir in status_dir.glob(f"**/{pattern}"):
@@ -175,6 +180,10 @@ def _find_sprint_file(sprint_num: int, project_root: Path) -> Optional[Path]:
                 sprint_file = sprint_dir / "sprint.md"
                 if sprint_file.exists():
                     return sprint_file
+                # Pattern 3: epic-NN/sprint-NN_title/sprint-NN.md
+                numbered = sprint_dir / f"sprint-{sprint_num}.md"
+                if numbered.exists():
+                    return numbered
 
     return None
 
@@ -1992,9 +2001,15 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
                 break
             # Pattern 2: sprint-NN_title/sprint.md folders
             for sprint_dir in search_path.glob(f"**/sprint-{sprint_num:02d}_*"):
-                if sprint_dir.is_dir() and (sprint_dir / "sprint.md").exists():
-                    sprint_file = sprint_dir / "sprint.md"
-                    break
+                if sprint_dir.is_dir():
+                    if (sprint_dir / "sprint.md").exists():
+                        sprint_file = sprint_dir / "sprint.md"
+                        break
+                    # Pattern 3: sprint-NN_title/sprint-NN.md
+                    numbered = sprint_dir / f"sprint-{sprint_num}.md"
+                    if numbered.exists():
+                        sprint_file = numbered
+                        break
             if sprint_file:
                 break
 
@@ -2012,11 +2027,17 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
                 sprint_file = found[0]
                 already_in_progress = True
             else:
-                # Pattern 2: sprint-NN_title/sprint.md folders (exclude --done folders)
+                # Pattern 2+3: sprint-NN_title/sprint.md or sprint-NN.md folders
                 for sprint_dir in search_path.glob(f"**/sprint-{sprint_num:02d}_*"):
                     if sprint_dir.is_dir() and "--done" not in sprint_dir.name:
                         if (sprint_dir / "sprint.md").exists():
                             sprint_file = sprint_dir / "sprint.md"
+                            already_in_progress = True
+                            break
+                        # Pattern 3: sprint-NN_title/sprint-NN.md
+                        numbered = sprint_dir / f"sprint-{sprint_num}.md"
+                        if numbered.exists():
+                            sprint_file = numbered
                             already_in_progress = True
                             break
 
@@ -3905,7 +3926,12 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     maestro_mode = (target / "templates" / "project").exists()
 
     # 4. Define source paths based on mode
-    master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
+    # Read master project path from installer config, fallback to default
+    maestro_source_file = Path.home() / ".claude" / "maestro-source"
+    if maestro_source_file.exists():
+        master_project = Path(maestro_source_file.read_text().strip())
+    else:
+        master_project = Path.home() / "Development" / "Dreadnought" / "claude-maestro"
     global_claude = Path.home() / ".claude"
 
     if maestro_mode:

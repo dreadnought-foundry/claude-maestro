@@ -92,6 +92,9 @@ from .sprint import (
 # Analysis
 from .analysis import analyze_patterns, capture_baseline, compare_baseline
 
+# Context builder
+from .context import build_context
+
 # Utilities
 from .utils import (
     check_git_clean,
@@ -112,6 +115,8 @@ __all__ = [
     "analyze_patterns",
     "capture_baseline",
     "compare_baseline",
+    # Context builder
+    "build_context",
     # Constants
     "FOLDER_ARCHIVED",
     "FOLDER_BACKLOG",
