@@ -134,4 +134,4 @@ If any step fails:
 - Report the error clearly
 - Do NOT advance to next step
 - Suggest fix or ask user for guidance
-- User can retry with `/sprint-studlymode $ARGUMENTS` to resume from current step
+- User can retry with `/sprint-studlymode-start $ARGUMENTS` to resume from current step
