@@ -1,0 +1,62 @@
+# Global Claude Code Instructions
+
+## Sprint Workflow System
+
+This is a **3-layer workflow enforcement system** for consistent sprint execution across all projects.
+
+### Quick Start
+
+```bash
+# Start a new sprint
+/sprint-start <N>
+
+# Check current progress
+/sprint-status
+
+# Advance to next step after completing current
+/sprint-next
+
+# Complete sprint (runs pre-flight checklist)
+/sprint-complete
+
+# Abandon if needed
+/sprint-abandon <reason>
+```
+
+### How It Works
+
+1. **Slash Commands** - Entry points that guide workflow execution
+2. **State File** - `.claude/sprint-state.json` tracks progress per project
+3. **Steps Definition** - `~/.claude/sprint-steps.json` defines the workflow
+
+### Phases Overview
+
+| Phase | Name | Steps | Description |
+|-------|------|-------|-------------|
+| 1 | Planning | 1.1-1.4 | Read sprint, design architecture, clarify requirements |
+| 2 | Test-First Implementation | 2.1-2.4 | TDD: write tests, implement, run tests, fix failures |
+| 3 | Validation & Refactoring | 3.1-3.4 | Verify migrations, quality review, refactor, re-test |
+| 4 | Documentation | 4.1 | Generate dialog examples |
+| 5 | Commit | 5.1 | Stage and commit changes |
+| 6 | Completion | 6.1-6.4 | Update sprint file, checklist, close sprint |
+
+### Key Features
+
+- **DRY Architecture Design** - Plan agent designs code structure before implementation
+- **Mandatory Clarification** - Must ask user questions before starting implementation
+- **Post-Implementation Refactoring** - Clean up code after tests pass
+- **Pre-Flight Checklist** - 9 items must pass before sprint completion
+
+### Project Setup
+
+For a project to use this workflow, it needs:
+
+1. Sprint planning files in `docs/sprints/sprint-NN_title.md`
+2. The state file `.claude/sprint-state.json` (created by `/sprint-start`)
+
+### Enforcement Rules
+
+- Cannot skip steps - must complete current before advancing
+- Cannot commit before Phase 5
+- Cannot complete without all checklist items passing
+- Every step recorded with timestamp for audit trail
