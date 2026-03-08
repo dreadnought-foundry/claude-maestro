@@ -49,6 +49,19 @@ This single command handles ALL completion steps automatically:
 
 Before running the automation script, generate a **real** postmortem from actual data:
 
+### 0. Update Deferred Work Tracker
+
+Before generating the postmortem, check for deferred/incomplete work:
+
+1. Review the sprint file's "Action Items for Next Sprint" section (if any)
+2. Review any TODO/FIXME items introduced during the sprint
+3. Check for acceptance criteria marked as partial or deferred
+4. If deferred items exist, append them to `docs/sprints/DEFERRED.md`:
+   - Add rows to the "Active Deferred Items" table
+   - Add entries under "By Target Sprint" → "Unassigned" (or specific sprint if known)
+   - Update the "Last Updated" date
+5. If `DEFERRED.md` doesn't exist, create it using the standard template
+
 ### 1. Generate Real Postmortem
 
 **DO NOT use TODO-filled templates.** Instead:

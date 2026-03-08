@@ -94,7 +94,8 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
         print("  │   ├── 4-blocked/")
         print("  │   ├── 5-aborted/")
         print("  │   ├── 6-archived/")
-        print("  │   └── registry.json")
+        print("  │   ├── registry.json")
+        print("  │   └── DEFERRED.md")
         print("  ├── CLAUDE.md")
         print("  └── .gitignore (updated)")
         return {"status": "dry-run", "target": str(target)}
@@ -230,7 +231,72 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     else:
         print("✓ CLAUDE.md already exists, skipping")
 
-    # 11. Create sprint registry
+    # 11. Create DEFERRED.md
+    print("→ Creating DEFERRED.md...")
+    deferred_path = target / "docs" / "sprints" / "DEFERRED.md"
+    if not deferred_path.exists():
+        deferred_path.write_text(
+            "# Deferred Work Tracker\n"
+            "\n"
+            "This file centralizes all deferred work items from sprints to prevent lost context.\n"
+            "\n"
+            "**Last Updated:** (auto)\n"
+            "**Owner:** Development Team\n"
+            "\n"
+            "---\n"
+            "\n"
+            "## Active Deferred Items\n"
+            "\n"
+            "Items that are pending implementation in future sprints.\n"
+            "\n"
+            "| Original Sprint | Deferred Item | Target Sprint | Priority | Status |\n"
+            "|-----------------|---------------|---------------|----------|--------|\n"
+            "\n"
+            "---\n"
+            "\n"
+            "## Recently Completed\n"
+            "\n"
+            "Items that were deferred and have since been completed.\n"
+            "\n"
+            "| Original Sprint | Deferred Item | Completed In | Date |\n"
+            "|-----------------|---------------|--------------|------|\n"
+            "\n"
+            "---\n"
+            "\n"
+            "## By Target Sprint\n"
+            "\n"
+            "### Unassigned\n"
+            "\n"
+            "---\n"
+            "\n"
+            "## Guidelines\n"
+            "\n"
+            "### Adding Deferred Items\n"
+            "\n"
+            "When deferring work in a sprint:\n"
+            "\n"
+            "1. Add entry to this file immediately\n"
+            "2. Reference target sprint if known\n"
+            "3. Include original sprint for context\n"
+            "4. Set priority: High (blocking), Medium (important), Low (nice-to-have)\n"
+            "\n"
+            "### Format\n"
+            "\n"
+            "```markdown\n"
+            '| {Sprint Number} | {Brief description} | {Target Sprint or "-"} | {High/Medium/Low} | {Pending/In Progress/Done} |\n'
+            "```\n"
+            "\n"
+            "### Reviewing Deferred Items\n"
+            "\n"
+            "- Before starting a sprint, check if any deferred items target it\n"
+            "- During epic planning, review unassigned items\n"
+            "- Weekly: Review high-priority items for scheduling\n"
+        )
+        print("✓ Created DEFERRED.md")
+    else:
+        print("✓ DEFERRED.md already exists, skipping")
+
+    # 12. Create sprint registry
     print("→ Creating sprint registry...")
     registry = {
         "counters": {"next_sprint": 1, "next_epic": 1},
@@ -303,7 +369,8 @@ def create_project(target_path: Optional[str] = None, dry_run: bool = False) -> 
     print("│   ├── 4-blocked/")
     print("│   ├── 5-aborted/")
     print("│   ├── 6-archived/")
-    print("│   └── registry.json")
+    print("│   ├── registry.json")
+    print("│   └── DEFERRED.md")
     print("└── CLAUDE.md")
 
     print("\nNext steps:")

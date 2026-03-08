@@ -37,6 +37,14 @@ Records pre-existing failures to `.claude/test-baseline-$ARGUMENTS.json`.
 Read CLAUDE.md for code standards, architecture patterns, and sprint-relevant context.
 If no CLAUDE.md exists, skip silently.
 
+**0.4: Review Deferred Items**
+
+Check `docs/sprints/DEFERRED.md` for items that should be included in this sprint:
+- Read the file (skip silently if it doesn't exist)
+- Look for items with a Target Sprint matching this sprint number
+- Look for High/Medium priority unassigned items that are relevant to this sprint's scope
+- If relevant deferred items found, surface them to the user during the clarification step (1.3)
+
 ### 1. Initialize Sprint
 
 Run the start-sprint automation:
