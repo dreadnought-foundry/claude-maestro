@@ -211,6 +211,78 @@ def _is_epic_sprint(sprint_path: Path) -> Tuple[bool, Optional[int]]:
     return False, None
 
 
+def _update_epic_sprint_status(sprint_path: Path, sprint_num: int, new_status: str) -> None:
+    """
+    Update a sprint's status in its parent epic's _epic.md sprints table.
+
+    Finds the _epic.md file by walking up from the sprint path, then updates
+    the markdown table row matching the sprint number.
+
+    Args:
+        sprint_path: Path to the sprint file (can be pre- or post-move)
+        sprint_num: Sprint number to update
+        new_status: New status string (e.g., 'in-progress', 'done', 'aborted')
+
+    Example:
+        >>> _update_epic_sprint_status(sprint_path, 1012, "done")
+    """
+    is_epic, epic_num = _is_epic_sprint(sprint_path)
+    if not is_epic:
+        return
+
+    # Find epic folder by walking up from sprint path
+    epic_file = None
+    current = sprint_path.parent
+    for _ in range(5):  # max 5 levels up
+        candidate = current / "_epic.md"
+        if candidate.exists():
+            epic_file = candidate
+            break
+        if current.name.startswith("epic-"):
+            # We're at the epic folder but no _epic.md
+            break
+        current = current.parent
+
+    if not epic_file:
+        # Try finding by searching in sprints directories
+        project_root = find_project_root()
+        for status_dir in ["2-in-progress", "1-todo", "3-done"]:
+            search_path = project_root / "docs" / "sprints" / status_dir
+            if search_path.exists():
+                for epic_dir in search_path.glob(f"epic-{epic_num:02d}_*"):
+                    candidate = epic_dir / "_epic.md"
+                    if candidate.exists():
+                        epic_file = candidate
+                        break
+            if epic_file:
+                break
+
+    if not epic_file:
+        print(f"  ⚠ Could not find _epic.md for epic {epic_num} — skipping table update")
+        return
+
+    with open(epic_file, "r") as f:
+        content = f.read()
+
+    # Find and update the sprint row in the markdown table
+    # Matches: | 1012 | Some title | old-status |
+    # Also matches with varying whitespace and sprint number formats (with/without leading zeros)
+    pattern = re.compile(
+        rf"(\|\s*{sprint_num}\s*\|[^|]+\|)\s*\w[\w-]*\s*\|",
+        re.MULTILINE,
+    )
+    match = pattern.search(content)
+    if match:
+        old_line = match.group(0)
+        new_line = f"{match.group(1)} {new_status} |"
+        content = content.replace(old_line, new_line, 1)
+        with open(epic_file, "w") as f:
+            f.write(content)
+        print(f"✓ Updated epic {epic_num} sprint table: sprint {sprint_num} → {new_status}")
+    else:
+        print(f"  ⚠ Sprint {sprint_num} not found in epic {epic_num} sprints table")
+
+
 def _update_yaml_frontmatter(file_path: Path, updates: dict) -> None:
     """
     Update YAML frontmatter in markdown file.
@@ -679,6 +751,10 @@ started: null
 completed: null
 hours: null
 workflow_version: "3.1.0"
+# Sprint 1320: QA review fields — populated by the orchestrator's QA agent
+# after implementation. `qa_review` is `pass`, `concern`, or `fail`.
+qa_review: null
+qa_reviewed_at: null
 ---
 
 # Sprint {sprint_num}: {title}
@@ -1393,6 +1469,7 @@ def register_new_sprint(
         raise FileOperationError(f"Failed to register sprint: {e}") from e
 
 
+
 def register_new_epic(
     title: str, sprint_count: int = 0, dry_run: bool = False, **metadata
 ) -> int:
@@ -1709,6 +1786,64 @@ def reset_epic(epic_num: int, dry_run: bool = False) -> dict:
     return deleted
 
 
+def _seed_registry_from_frontmatter(sprint_num: int) -> dict:
+    """
+    Sprint 1342: build a registry entry seed from the sprint file's
+    frontmatter. Used by `update_registry` when the sprint isn't already
+    in the registry — without this, manually-created sprints (skipping
+    /sprint-new) lose their title/type/epic/created during /sprint-complete
+    or /sprint-abort.
+
+    Args:
+        sprint_num: Sprint number to look up on disk.
+
+    Returns:
+        Dict with title/type/epic/created/started/completed/hours fields,
+        populated from the sprint file's YAML frontmatter. Returns an empty
+        dict if the file can't be found or parsed (caller's existing logic
+        still works; it just doesn't gain seed metadata).
+    """
+    import re
+
+    try:
+        project_root = find_project_root()
+    except Exception:
+        return {}
+
+    sprint_file = _find_sprint_file(sprint_num, project_root)
+    if not sprint_file:
+        return {}
+
+    try:
+        content = sprint_file.read_text()
+    except Exception:
+        return {}
+
+    yaml_match = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
+    if not yaml_match:
+        return {}
+
+    yaml_content = yaml_match.group(1)
+    seed: dict = {}
+    fields = ["title", "type", "epic", "created", "started", "completed", "hours"]
+    for field in fields:
+        m = re.search(rf"^{field}:\s*(.+)$", yaml_content, re.MULTILINE)
+        if not m:
+            continue
+        raw = m.group(1).strip().strip('"').strip("'")
+        if raw == "null" or raw == "":
+            seed[field] = None
+        elif field in ("epic", "hours"):
+            try:
+                seed[field] = int(raw) if field == "epic" else float(raw)
+            except ValueError:
+                seed[field] = None
+        else:
+            seed[field] = raw
+
+    return seed
+
+
 def update_registry(
     sprint_num: int, status: str, dry_run: bool = False, **metadata
 ) -> None:
@@ -1763,9 +1898,14 @@ def update_registry(
 
         return
 
-    # Update sprint entry
+    # Update sprint entry. Sprint 1342: when the sprint isn't already in
+    # the registry (e.g., the user created the sprint folder manually
+    # without running /sprint-new, then ran /sprint-complete), seed the
+    # entry from the sprint file's frontmatter rather than leaving it
+    # empty. The previous behavior dropped title/type/epic/created on
+    # the floor — this preserves them.
     if sprint_key not in registry["sprints"]:
-        registry["sprints"][sprint_key] = {}
+        registry["sprints"][sprint_key] = _seed_registry_from_frontmatter(sprint_num)
 
     registry["sprints"][sprint_key]["status"] = status
     registry["sprints"][sprint_key].update(metadata)
@@ -2057,6 +2197,12 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
 
     yaml_match = re.search(r"^---\n(.*?)\n---", content, re.DOTALL)
 
+    # Sprint 1319: parse sprint type + estimated_effort from frontmatter so
+    # the start-sprint output can advise on agent-team execution. Both are
+    # optional; default to None.
+    sprint_type: Optional[str] = None
+    estimated_effort: Optional[str] = None
+
     if yaml_match:
         # Parse existing frontmatter
         yaml_content = yaml_match.group(1)
@@ -2073,6 +2219,14 @@ def start_sprint(sprint_num: int, dry_run: bool = False) -> dict:
                 if heading_match
                 else f"Sprint {sprint_num}"
             )
+        type_match = re.search(r"^type:\s*(.+)$", yaml_content, re.MULTILINE)
+        if type_match:
+            sprint_type = type_match.group(1).strip().strip('"').lower()
+        effort_match = re.search(
+            r"^estimated_effort:\s*(.+)$", yaml_content, re.MULTILINE
+        )
+        if effort_match:
+            estimated_effort = effort_match.group(1).strip().strip('"').upper()
     else:
         # No frontmatter - extract title from markdown heading and add frontmatter
         heading_match = re.search(r"^#\s+Sprint\s+\d+:\s*(.+)$", content, re.MULTILINE)
@@ -2181,6 +2335,9 @@ workflow_version: "{workflow_version}"
 
         print(f"✓ Moved to: {new_path}")
 
+    # Update epic sprint table
+    _update_epic_sprint_status(new_path, sprint_num, "in-progress")
+
     # Create state file
     state_file = project_root / ".claude" / f"sprint-{sprint_num}-state.json"
     state = {
@@ -2216,6 +2373,25 @@ workflow_version: "{workflow_version}"
         print(f"Epic: {epic_num}")
     print("Next: Begin Phase 1 (Planning)")
     print(f"{'='*60}")
+
+    # Sprint 1319/1320: Advisory message for fullstack L/XL sprints.
+    # Sprint 1319 suggested parallel agent-team execution; sprint 1320 added
+    # the Lead Orchestrator + QA-gate flow so the advisory now points to
+    # /sprint-orchestrator rather than ad-hoc agent spawning.
+    if sprint_type == "fullstack" and estimated_effort in ("L", "XL"):
+        print("")
+        print("⚡ Fullstack L/XL sprint detected. Run the orchestrator:")
+        print(f"   /sprint-orchestrator {sprint_num}")
+        print("")
+        print("   The orchestrator spawns backend + frontend engineers in")
+        print("   parallel, runs a QA gate over the merged diff, and reports")
+        print("   back. See dev-team rulebook Section 8 'Orchestrated")
+        print("   Execution' for the full flow.")
+        print("   Enable with: export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1")
+    elif sprint_type and estimated_effort:
+        print(
+            f"→ Single-agent execution (sprint is {sprint_type}/{estimated_effort})"
+        )
 
     return summary
 
@@ -2330,6 +2506,9 @@ def abort_sprint(sprint_num: int, reason: str, dry_run: bool = False) -> dict:
         sprint_num, status="aborted", abort_reason=reason, hours=hours if hours else 0
     )
     print("✓ Registry updated")
+
+    # Update epic sprint table
+    _update_epic_sprint_status(new_path, sprint_num, "aborted")
 
     summary = {
         "status": "aborted",
@@ -4314,6 +4493,9 @@ def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
     )
     print("✓ Registry updated")
 
+    # 5b. Update epic sprint table
+    _update_epic_sprint_status(Path(new_path), sprint_num, "done")
+
     # 6. Commit changes
     print("→ Committing changes...")
     try:
@@ -4326,12 +4508,24 @@ def complete_sprint(sprint_num: int, dry_run: bool = False) -> dict:
             f"Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
         )
         subprocess.run(["git", "add", "-A"], check=True, capture_output=True, text=True)
-        subprocess.run(
-            ["git", "commit", "-m", commit_msg],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            # Pre-commit hooks (e.g. end-of-file-fixer) may modify staged files,
+            # causing the first commit to fail. Re-stage and retry once.
+            print("  Pre-commit hooks modified files, re-staging and retrying...")
+            subprocess.run(["git", "add", "-A"], check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
         print("✓ Changes committed")
     except subprocess.CalledProcessError as e:
         raise GitError(f"Failed to commit changes: {e.stderr}") from e
